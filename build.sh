@@ -26,6 +26,7 @@ echo "built $APP"
 if [ "${1:-}" = install ]; then
   mkdir -p ~/Applications
   osascript -e 'quit app "HealthWidget"' 2>/dev/null || true
+  while pgrep -xq HealthWidget; do sleep 0.5; done
   rm -rf ~/Applications/HealthWidget.app && cp -R $APP ~/Applications/
   open ~/Applications/HealthWidget.app
   echo "installed ~/Applications/HealthWidget.app"
