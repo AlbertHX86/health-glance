@@ -29,7 +29,6 @@ struct HealthWidgetView: View {
         let size: CardSize = family == .systemSmall ? .small : (family == .systemMedium ? .medium : .large)
         CardView(summary: entry.summary, size: size)
             .containerBackground(.background, for: .widget)
-            .widgetURL(URL(string: "healthwidget://open"))
     }
 }
 

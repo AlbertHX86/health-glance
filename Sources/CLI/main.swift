@@ -1,7 +1,7 @@
 import Foundation
 
 // healthwidget-cli [file]: parse a health file (or the newest one in the inbox) and print what was read;
-// with --generate also call MiniMax and write summary.json, as the app does.
+// with --generate also call MiniMax and print the summary; add --save to write summary.json / history.json as the app does.
 
 let args = Array(CommandLine.arguments.dropFirst())
 let file = args.first { !$0.hasPrefix("--") }.map { URL(fileURLWithPath: $0) }
@@ -15,7 +15,7 @@ if args.contains("--generate") {
     Task {
         do {
             let t0 = Date()
-            let s = try await Engine.run(file: url)
+            let s = try await Engine.run(file: url, persist: args.contains("--save"))
             print(String(format: "\n耗时 %.1f 秒", Date().timeIntervalSince(t0)))
             print("标题：\(s.headline)\n小结：\(s.summary)\n建议：\(s.tips.joined(separator: " / "))")
         } catch { print("失败：\(error.localizedDescription)") }

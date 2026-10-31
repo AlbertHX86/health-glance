@@ -57,7 +57,9 @@ final class Model: ObservableObject {
     func saveKey() {
         var c = Config.load()
         c.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        do { try c.save(); status = "API Key 已保存" } catch { status = "保存失败：\(error.localizedDescription)" }
+        do { try c.save(); status = "API Key 已保存" } catch { status = "保存失败：\(error.localizedDescription)"; return }
+        lastAttempt = .distantPast
+        check()
     }
 
     func toggleLogin(_ on: Bool) {

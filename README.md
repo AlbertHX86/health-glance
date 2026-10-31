@@ -55,17 +55,22 @@ API Key 保存在 `~/Library/Application Support/HealthWidget/config.json`，文
 
 **存储文件。**加一个「存储文件」动作，关闭「询问存储位置」，目标路径填 `HealthWidget/health.txt`，打开「覆盖原有文件」。
 
+**先手动运行一次。**第一次运行时 iPhone 会逐项询问能否读取健康数据，全部允许。自动化运行时弹不出这个询问。
+
 **设为每天自动运行。**打开「自动化」，点「+」，选「App」，选一个你每天早上都会打开的 App（例如微信），选「已打开」，设为「立即运行」，运行「健康导出」。
 
 为什么不定时运行：iPhone 锁屏时读不到健康数据，定时触发常会失败。打开 App 时手机一定已经解锁。
 
 Mac 端每天只自动生成一次。同一天文件被反复覆盖时，只有数字变了、并且离上次生成已超过 4 小时，才会重新生成。
 
+这些步骤是按 iOS 快捷指令的界面写的，Mac 上没法实测。各项的名称可能与你手机上略有不同。做好后，把生成的 health.txt 内容发我一次，我来核对解析是否正确。
+
 ## 测试
 
 ```bash
 ./build/healthwidget-cli sample/2026-10-31.txt               # 只解析
-MINIMAX_API_KEY=… ./build/healthwidget-cli sample/2026-10-31.txt --generate
+./build/healthwidget-cli sample/2026-10-31.txt --generate     # 调用 MiniMax，只打印，不写缓存
+./build/healthwidget-cli --generate --save                    # 读最新数据，写入 summary.json（与程序相同）
 ```
 
 不用 iPhone 也能测：把文件放进 `~/Library/Application Support/HealthWidget/inbox/`，程序同样会读取。

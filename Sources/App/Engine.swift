@@ -23,13 +23,14 @@ struct Config: Codable {
 }
 
 enum EngineError: LocalizedError {
-    case noKey, noData, http(Int, String), badReply(String)
+    case noKey, noData, http(Int, String), badReply(String), truncated
     var errorDescription: String? {
         switch self {
         case .noKey: return "还没有填 MiniMax API Key"
         case .noData: return "没有找到健康数据文件（iCloud 云盘 › 快捷指令 › HealthWidget）"
         case let .http(code, body): return "MiniMax 接口返回 \(code)：\(body.prefix(200))"
         case let .badReply(s): return "模型回复无法解析：\(s.prefix(200))"
+        case .truncated: return "模型思考过长，回复被截断，请再试一次"
         }
     }
 }
@@ -54,12 +55,13 @@ enum Engine {
         return s
     }
 
-    /// Reads the newest health file, asks MiniMax for a summary and writes summary.json for the widget.
-    static func run(file: URL? = nil) async throws -> Summary {
+    /// Reads the newest health file, asks MiniMax for a summary and writes summary.json for the widget
+    /// (persist: false leaves history.json and summary.json untouched, for tests).
+    static func run(file: URL? = nil, persist: Bool = true) async throws -> Summary {
         let cfg = Config.load()
         guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
         guard let url = file ?? HealthParser.latestFile(), let day = HealthParser.read(url) else { throw EngineError.noData }
-        let all = try History.upsert(day)
+        let all = try persist ? History.upsert(day) : History.load().filter { $0.date != day.date } + [day]
         let avg = History.weekAverage(all, before: day.date)
         let days = all.filter { $0.date < day.date }.suffix(7).count
         let reply = try await chat(cfg, prompt(day, avg, days))
@@ -70,7 +72,7 @@ enum Engine {
             summary: (obj["summary"] as? String) ?? reply,
             tips: (obj["tips"] as? [String]) ?? [],
             metrics: day.metrics, weekAvg: avg, error: nil)
-        try s.save()
+        if persist { try s.save() }
         return s
     }
 
@@ -83,7 +85,7 @@ enum Engine {
         let body: [String: Any] = [
             "model": cfg.model,
             "messages": [["role": "system", "content": system], ["role": "user", "content": user]],
-            "max_tokens": 4096,
+            "max_tokens": 8192,  // includes the reasoning tokens
             "reasoning_effort": cfg.reasoningEffort,
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -92,9 +94,11 @@ enum Engine {
         let text = String(data: data, encoding: .utf8) ?? ""
         guard code == 200 else { throw EngineError.http(code, text) }
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let msg = (obj["choices"] as? [[String: Any]])?.first?["message"] as? [String: Any],
-              let content = msg["content"] as? String
+              let choice = (obj["choices"] as? [[String: Any]])?.first,
+              let msg = choice["message"] as? [String: Any]
         else { throw EngineError.badReply(text) }
+        let content = (msg["content"] as? String) ?? ""
+        if choice["finish_reason"] as? String == "length", jsonObject(in: content) == nil { throw EngineError.truncated }
         // reasoning normally arrives in reasoning_content; drop any inline <think> block as well
         return content.replacingOccurrences(of: #"(?s)<think>.*?</think>"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
