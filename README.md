@@ -217,7 +217,7 @@ Garden settings in `config.json`:
 | `gardenName` | Your name on the page |
 | `gardenPlant` | Your plant |
 | `gardenDays` | Season length in days (default 14) |
-| `gardenStart` | First day of season 1, as `yyyy-MM-dd`; by default, the first day anyone has data |
+| `gardenStart` | First day of season 1, as `yyyy-MM-dd`. It is filled in automatically the first time the garden runs. |
 
 ## When summaries are made
 

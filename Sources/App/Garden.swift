@@ -176,6 +176,7 @@ enum Garden {
     /// then rewrite the page if anything that shows on it changed. Returns the page when it was written.
     @discardableResult
     static func update(cfg: Config, today: String = HealthParser.dateFmt.string(from: Date())) -> URL? {
+        var cfg = cfg
         var ledger = loadLedger()
         var records: [(String, DayRecord)] = HealthParser.people().compactMap { p in
             HealthParser.latestFile(person: p).flatMap(HealthParser.read).map { (p, $0) }
@@ -186,6 +187,13 @@ enum Garden {
         }
         for (name, r) in records {
             ledger.players[name, default: [:]][r.date] = GardenDay(metrics: r.metrics, plant: r.plant)
+        }
+        // fix season 1's first day once: deriving it from the ledger would drift after old days are pruned
+        if cfg.gardenStart == nil {
+            cfg.gardenStart = ledger.players.values.flatMap { $0.keys }.min() ?? today
+            var c = Config.loadFile()
+            c.gardenStart = cfg.gardenStart
+            try? c.save()
         }
         let cutoff = add(today, -120)
         for k in ledger.players.keys { ledger.players[k] = ledger.players[k]!.filter { $0.key >= cutoff } }

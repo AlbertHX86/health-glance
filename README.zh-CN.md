@@ -217,7 +217,7 @@ Mac 端可以显示多个人。每个人一个文件，命名为 `health-<名字
 | `gardenName` | 你在页面上的名字 |
 | `gardenPlant` | 你的植物 |
 | `gardenDays` | 每季天数，默认 14 |
-| `gardenStart` | 第 1 季的第一天，格式 `yyyy-MM-dd`；默认是最早有人有数据的那天 |
+| `gardenStart` | 第 1 季的第一天，格式 `yyyy-MM-dd`。菜园第一次运行时会自动填上。 |
 
 ## 什么时候生成小结
 

@@ -98,7 +98,7 @@ final class Model: ObservableObject {
     }
 
     func saveGarden() {
-        var c = Config.load()
+        var c = Config.loadFile()
         let name = gardenName.trimmingCharacters(in: .whitespaces)
         if !name.isEmpty, name != c.gardenName { Garden.rename(from: c.gardenName, to: name); c.gardenName = name }
         c.gardenHost = gardenHost
@@ -114,7 +114,7 @@ final class Model: ObservableObject {
     }
 
     func saveKey() {
-        var c = Config.load()
+        var c = Config.loadFile()
         c.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         do { try c.save(); status = L.t("API key saved", "API Key 已保存") } catch { status = L.t("Could not save: ", "保存失败：") + error.localizedDescription; return }
         lastAuto = [:]
@@ -126,7 +126,7 @@ final class Model: ObservableObject {
         guard l != lang else { return }
         lang = l
         L.lang = l
-        var c = Config.load()
+        var c = Config.loadFile()
         c.language = l
         try? c.save()
         lastAuto = [:]
@@ -154,6 +154,7 @@ final class Model: ObservableObject {
 
 struct MainView: View {
     @ObservedObject var model: Model
+    @State private var showSettings = Config.load().apiKey.isEmpty  // open until a key is saved
 
     func t(_ en: String, _ zh: String) -> String { model.lang == "zh" ? zh : en }
 
@@ -231,6 +232,7 @@ struct MainView: View {
                 }
                 .padding(.top, 4)
             }
+            DisclosureGroup(t("Settings", "设置"), isExpanded: $showSettings) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     SecureField("MiniMax API Key", text: $model.apiKey).textFieldStyle(.roundedBorder)
@@ -246,6 +248,8 @@ struct MainView: View {
             }
             .padding(12)
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.top, 4)
+            }
         }
         .padding(16)
         .frame(width: CardSize.large.frame.width + 32)

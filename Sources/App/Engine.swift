@@ -33,9 +33,14 @@ struct Config: Codable {
     }
 
     static func load() -> Config {
-        var c = (try? Data(contentsOf: Paths.config)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) } ?? Config()
+        var c = loadFile()
         if let k = ProcessInfo.processInfo.environment["MINIMAX_API_KEY"], !k.isEmpty { c.apiKey = k }
         return c
+    }
+
+    /// The file alone, without the environment override; start from this when changing and saving settings.
+    static func loadFile() -> Config {
+        (try? Data(contentsOf: Paths.config)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) } ?? Config()
     }
 
     func save() throws {
