@@ -204,7 +204,7 @@ enum Garden {
         // rewrite only when the page's inputs changed, so the shared folder is not touched every minute
         let enc = JSONEncoder()
         enc.outputFormatting = .sortedKeys  // dictionary order differs between runs; the comparison must not
-        let input = "\(cfg.gameMode)|\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
+        let input = "\(cfg.gameMode)|\(cfg.gameMode == "pets" ? SpritePack.fingerprint() : "")|\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
         let page = pageURL(cfg)
         if (try? String(contentsOf: lastInputURL, encoding: .utf8)) == input, FileManager.default.fileExists(atPath: page.path) { return nil }
         let html = cfg.gameMode == "garden" ? render(ledger, cfg: cfg, today: today, now: Date()) : Pets.render(ledger, cfg: cfg, today: today, now: Date())

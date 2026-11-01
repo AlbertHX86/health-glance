@@ -100,10 +100,29 @@ struct Pet {
     let ears: Int, pattern: Int, tail: Int, eyes: Int
     let shiny: Bool
     let extra: [String]  // rarity skills, known from hatching
+    var sprite: SpriteSpecies? = nil  // from your sprite pack, if there is one
 
-    func name(_ lang: String) -> String {
-        let n = lang == "zh" ? zhName : enName
-        return species == 0 ? n : n + (lang == "zh" ? ["", "（星空团）", "（彩虹团）"][species] : ["", " (Starry)", " (Rainbow)"][species])
+    func name(_ lang: String) -> String { lang == "zh" ? zhName : enName }
+
+    /// What kind of pet it is at a level: the sprite (or its evolved form), else Starry / Rainbow Puff for legendaries.
+    func kind(_ lang: String, level: Int) -> String? {
+        if let sp = sprite {
+            if let e = sp.evolve, level >= (e.level ?? 10) { return lang == "zh" ? e.zh : e.en }
+            return lang == "zh" ? sp.zh : sp.en
+        }
+        return species == 0 ? nil : (lang == "zh" ? ["", "星空团", "彩虹团"][species] : ["", "Starry Puff", "Rainbow Puff"][species])
+    }
+
+    /// The sprite picture for a level.
+    func picture(level: Int) -> String? {
+        guard let sp = sprite else { return nil }
+        if let e = sp.evolve, level >= (e.level ?? 10) { return e.image }
+        return sp.image
+    }
+
+    /// Name with its kind, as shown in battle logs and headers: 嘟噜（小魔女）
+    func label(_ lang: String, level: Int) -> String {
+        kind(lang, level: level).map { name(lang) + (lang == "zh" ? "（\($0)）" : " (\($0))") } ?? name(lang)
     }
 
     /// Skills it can use at a level: the element's own as they unlock, plus its rarity skills.
@@ -127,8 +146,13 @@ struct Pet {
         if rarity >= 2 { extra.append(r.pick(["charge", "deep", "still"])) }
         if rarity == 3 { extra.append(species == 1 ? "meteor" : "rainbow") }
         let body = species == 1 ? "#2b3a67" : species == 2 ? "url(#rb-\(Pets.uid(owner)))" : shiny ? "#c9a7ff" : r.pick(el.bodies)
-        return Pet(owner: owner, element: el, rarity: rarity, species: species, zhName: zh[a] + zh[b], enName: en[a], body: body,
-                   ears: r.int(4), pattern: r.int(4), tail: r.int(3), eyes: r.int(3), shiny: shiny, extra: extra)
+        var pet = Pet(owner: owner, element: el, rarity: rarity, species: species, zhName: zh[a] + zh[b], enName: en[a], body: body,
+                      ears: r.int(4), pattern: r.int(4), tail: r.int(3), eyes: r.int(3), shiny: shiny, extra: extra)
+        if let pack = Pets.pack {
+            var rs = RNG("sprite|\(owner)|\(season)")  // its own stream, so adding a pack does not change the rolls above
+            pet.sprite = pack.pick(rarity: rarity, &rs)
+        }
+        return pet
     }
 }
 
@@ -167,6 +191,9 @@ struct Battle {
 }
 
 enum Pets {
+    /// The sprite pack in use while a page is made (nil = the app's own drawings).
+    static var pack: SpritePack?
+
     /// A short id for SVG gradients, unique per owner on the page.
     static func uid(_ s: String) -> String {
         var g = RNG("uid|" + s)
@@ -229,7 +256,7 @@ enum Pets {
                      spd: p.stats.spd * k * (c.sleepy ? 0.7 : 1) * (c.energetic ? 1.1 : 1), crit: c.focused ? 0.18 : 0.08, yawn: c.sleepy ? 0.15 : 0)
         }
         var f = [fighter(x), fighter(y)]
-        let names = [x.pet.name(lang), y.pet.name(lang)]
+        let names = [x.pet.label(lang, level: x.level), y.pet.label(lang, level: y.level)]
         var log: [String] = []
         func say(_ s: String) { log.append(s) }
 
@@ -383,6 +410,17 @@ enum Pets {
 
     // MARK: drawing (original designs)
 
+    /// The pet's picture: a sprite from your pack, or the app's own drawing.
+    static func art(_ p: PetResult) -> String {
+        guard p.hatched, let file = p.pet.picture(level: p.level), let uri = SpritePack.dataURI(file) else { return petSVG(p) }
+        var h = "<div class=\"art\"><div class=\"pic r\(p.pet.rarity) s\(p.stage)\"><img src=\"\(uri)\" alt=\"\"></div>"
+        if p.pet.rarity == 3 { h += "<span class=\"halo\"></span>" }
+        if p.pet.rarity == 1 { h += "<span class=\"ov tr\">⭐</span>" }
+        if p.pet.shiny { h += "<span class=\"ov tl\">✨</span><span class=\"ov br\">✨</span>" }
+        if p.condition.sleepy { h += "<span class=\"ov bl\">💤</span>" }
+        return h + "</div>"
+    }
+
     static func petSVG(_ p: PetResult) -> String {
         let pet = p.pet, el = pet.element
         var s = #"<svg viewBox="0 0 160 150" class="pet" aria-hidden="true"><ellipse cx="80" cy="140" rx="44" ry="6" class="shadow"/>"#
@@ -452,7 +490,8 @@ enum Pets {
 
     // MARK: page
 
-    static func render(_ ledger: Ledger, cfg: Config, today: String, now: Date) -> String {
+    static func render(_ ledger: Ledger, cfg: Config, today: String, now: Date, sprites: Bool = true) -> String {
+        pack = sprites ? SpritePack.load() : nil
         let lang = cfg.language == "zh" ? "zh" : "en"
         func t(_ en: String, _ zh: String) -> String { lang == "zh" ? zh : en }
         let (index, dates) = Garden.season(ledger, start: cfg.gardenStart, length: cfg.gardenDays, today: today)
@@ -494,9 +533,9 @@ enum Pets {
             let prevExp = p.hatched ? PetResult.hatchAt + Double(p.level - 1) * 7 : 0
             let prog = min(1, max(0, (p.exp - prevExp) / (nextExp - prevExp)))
             h += """
-            <article class="plot"><div class="ph"><b>\(Garden.esc(p.owner))</b><span>\(p.hatched ? "\(p.pet.element.emoji) \(Garden.esc(p.pet.name(lang)))" : "🥚 " + t("Egg", "蛋"))</span></div>
+            <article class="plot"><div class="ph"><b>\(Garden.esc(p.owner))</b><span>\(p.hatched ? "\(p.pet.element.emoji) \(Garden.esc(p.pet.label(lang, level: p.level)))" : "🥚 " + t("Egg", "蛋"))</span></div>
             \(p.hatched ? "<span class=\"rar\" style=\"background:\(Rarity.colors[p.pet.rarity])\">\(Rarity.name(p.pet.rarity, lang))\(p.pet.shiny ? " · " + t("Shiny", "闪光") : "")</span>" : "")
-            \(petSVG(p))
+            \(art(p))
             <div class="stage"><b>\(p.hatched ? "\(stageName(p.stage, lang)) · Lv \(p.level)" : t("Hatching…", "孵化中…"))</b><span>\(Int(p.exp.rounded())) EXP · \(p.hatched ? t("next level at \(Int(nextExp))", "下一级 \(Int(nextExp))") : t("hatches at \(Int(PetResult.hatchAt))", "\(Int(PetResult.hatchAt)) 孵化"))</span></div>
             <div class="bar"><i style="width:\(Int(prog * 100))%"></i></div>
             """
@@ -566,6 +605,12 @@ enum Pets {
     static let css = """
     .pet{display:block;width:100%;height:160px;margin:2px 0}.shadow{fill:var(--line)}
     .hint{color:var(--sub);font-size:13px;margin:4px 0 0}
+    .art{position:relative;height:160px;display:flex;align-items:center;justify-content:center;margin:2px 0}
+    .pic{border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 4px var(--line),0 6px 14px rgba(0,0,0,.12);animation:bob 2.2s ease-in-out infinite}
+    .pic img{display:block;width:100%;height:100%;object-fit:cover}.pic.s1{width:100px;height:100px}.pic.s2{width:122px;height:122px}.pic.s3{width:142px;height:142px}
+    .pic.r1{box-shadow:0 0 0 4px #3a86ff,0 6px 14px rgba(0,0,0,.12)}.pic.r2{box-shadow:0 0 0 4px #9b5de5,0 0 22px rgba(155,93,229,.45)}.pic.r3{box-shadow:0 0 0 4px #f4a100,0 0 26px rgba(244,161,0,.55)}
+    .halo{position:absolute;top:2px;left:50%;width:56px;height:14px;margin-left:-28px;border:3px solid #f4c430;border-radius:50%}
+    .ov{position:absolute;font-size:18px}.ov.tr{top:8px;right:22%}.ov.tl{top:8px;left:22%}.ov.br{bottom:10px;right:22%}.ov.bl{bottom:10px;left:22%}
     .rar{display:inline-block;color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:1px 8px;margin-top:4px}
     .sk{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px;font-size:12px}.sk li{display:grid;grid-template-columns:auto 1fr;gap:8px}.sk span{color:var(--sub)}.sk li.locked{opacity:.45}
     .fight{margin:8px 0 0;padding:8px 12px}.fight ol{margin:8px 0 2px;padding-left:20px;font-size:13px;color:var(--sub)}.fight ol li:last-child{color:var(--ink);font-weight:600;list-style:none;margin-left:-20px}

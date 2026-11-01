@@ -245,6 +245,21 @@ Rarer pets also get skills that depend on how you lived today:
 
 Pets, battles and their logs are worked out from names and dates. Every time the page is made, the results are the same.
 
+**Your own pictures as pets.** You can replace the drawn pets with your own pictures.
+
+1. Put the images and a `sprites.json` file in `~/Library/Application Support/HealthWidget/sprites/` on the host's Mac. The page embeds the pictures, so the other players need nothing.
+2. In `sprites.json`, give each species a picture, a name, the lowest rarity it hatches from, and, optionally, an evolved form with its own picture and the level at which it evolves:
+
+```json
+{"species": [
+  {"id": "octo", "image": "octo.jpg", "zh": "小章鱼", "en": "Octo", "rarity": 0},
+  {"id": "witch", "image": "apprentice.jpg", "zh": "魔法学徒", "en": "Apprentice", "rarity": 1,
+   "evolve": {"image": "witch.webp", "level": 10, "zh": "大魔女", "en": "Grand Witch"}}
+]}
+```
+
+A pet hatches as the species with the highest rarity that is not above the rarity it rolled. With the file above, Common pets hatch as Octo and Rare or better as Apprentice. The pack stays on your Mac and is not part of this repository. Only use pictures you have the right to use.
+
 ### Garden
 
 <img src="docs/garden.png" width="640" alt="Garden page with three players">

@@ -14,7 +14,7 @@ if args.contains("--pets-demo") {
     cfg.gardenName = "小雨"
     cfg.gardenStart = Garden.add(today, -8)
     let out = URL(fileURLWithPath: "build/pets-demo.html")
-    try! Pets.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
+    try! Pets.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date(), sprites: !args.contains("--no-sprites")).write(to: out, atomically: true, encoding: .utf8)
     print(out.path); exit(0)
 }
 if args.contains("--pets-gallery") {
@@ -35,7 +35,7 @@ if args.contains("--pets-gallery") {
     }
     cfg.gardenStart = Garden.add(today, -8)
     let out = URL(fileURLWithPath: "build/pets-gallery.html")
-    try! Pets.render(l, cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
+    try! Pets.render(l, cfg: cfg, today: today, now: Date(), sprites: !args.contains("--no-sprites")).write(to: out, atomically: true, encoding: .utf8)
     print(out.path, wanted); exit(0)
 }
 if args.contains("--garden-demo") {

@@ -245,6 +245,21 @@ Mac 端可以显示多个人。每个人一个文件，命名为 `health-<名字
 
 团团、对战结果和对战过程都由名字和日期算出，每次生成页面，结果都一样。
 
+**用自己的图片当精灵。**可以用自己的图片代替画出来的团团：
+
+1. 在主持人的 Mac 上，把图片和一个 `sprites.json` 放进 `~/Library/Application Support/HealthWidget/sprites/`。页面会把图片直接嵌进去，其他玩家什么都不用装。
+2. 在 `sprites.json` 里给每种精灵写图片、名字、最低从哪个稀有度孵出；也可以写进化形态，包括进化后的图片和进化等级：
+
+```json
+{"species": [
+  {"id": "octo", "image": "octo.jpg", "zh": "小章鱼", "en": "Octo", "rarity": 0},
+  {"id": "witch", "image": "apprentice.jpg", "zh": "魔法学徒", "en": "Apprentice", "rarity": 1,
+   "evolve": {"image": "witch.webp", "level": 10, "zh": "大魔女", "en": "Grand Witch"}}
+]}
+```
+
+孵化时，团团会变成「稀有度不高于它抽到的稀有度」里最高的那一种。按上面的文件，普通孵出小章鱼，稀有及以上孵出魔法学徒。这些图片只存在你的 Mac 上，不在这个仓库里。请只使用你有权使用的图片。
+
 ### 菜园
 
 <img src="docs/garden-zh.png" width="640" alt="三个人的菜园页面">
