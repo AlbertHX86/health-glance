@@ -23,7 +23,7 @@ final class Model: ObservableObject {
     @Published var trendDays = UserDefaults.standard.object(forKey: "trendDays") as? Int ?? 30 {
         didSet { UserDefaults.standard.set(trendDays, forKey: "trendDays") }
     }
-    @Published var showTrends = UserDefaults.standard.object(forKey: "showTrends") as? Bool ?? true {
+    @Published var showTrends = UserDefaults.standard.object(forKey: "showTrends") as? Bool ?? false {  // the island always shows it; the menu keeps it folded so it fits small screens
         didSet { UserDefaults.standard.set(showTrends, forKey: "showTrends") }
     }
     @Published var sources = Sources.latest()
