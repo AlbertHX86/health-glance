@@ -22,6 +22,8 @@ enum Paths {
         home.appendingPathComponent("Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/HealthWidget", isDirectory: true),
         home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/HealthGlance", isDirectory: true),
         base.appendingPathComponent("inbox", isDirectory: true),
+        // where a generated players' shortcut saves by default; only this Mac's owner's own runs can land here
+        home.appendingPathComponent("Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/HealthGlance", isDirectory: true),
     ]
     static let localInbox = inboxes[2]
 
@@ -62,6 +64,12 @@ enum Metrics {
         MetricDef(key: "hr", name: "平均心率", unit: "次/分", en: "Heart rate", enUnit: "bpm", aliases: ["平均心率", "心率", "heart rate", "heart_rate"]),
         MetricDef(key: "spo2", name: "血氧", unit: "%", en: "SpO₂", enUnit: "%", aliases: ["血氧饱和度", "血氧", "oxygen saturation", "blood_oxygen_saturation", "spo2"]),
         MetricDef(key: "weight", name: "体重", unit: "公斤", en: "Weight", enUnit: "kg", aliases: ["体重", "weight", "body mass", "body_mass"]),
+    ]
+
+    /// Values no real day produces; such a value is treated as missing.
+    static let plausible: [String: ClosedRange<Double>] = [
+        "steps": 0...100_000, "distance_km": 0...150, "active_kcal": 0...8_000, "exercise_min": 0...1_000, "stand_h": 0...24,
+        "sleep_h": 0...20, "resting_hr": 25...150, "hrv": 1...300, "hr": 25...220, "spo2": 50...100, "weight": 20...350,
     ]
     static let byKey = Dictionary(uniqueKeysWithValues: defs.map { ($0.key, $0) })
 
@@ -107,7 +115,12 @@ enum HealthParser {
     static func files() -> [(url: URL, modified: Date)] {
         let fm = FileManager.default
         var out: [(URL, Date)] = []
-        for dir in Paths.inboxes {
+        // one level of subfolders too: a Save File subpath of HealthGlance/health-….txt inside the shared folder makes one
+        let subs = Paths.inboxes.flatMap { d in
+            ((try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles)) ?? [])
+                .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        }
+        for dir in Paths.inboxes + subs {
             guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
             for u in items where ["txt", "json", "md"].contains(u.pathExtension.lowercased()) && u.lastPathComponent.lowercased() != Sources.file {
                 out.append((u, (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
@@ -164,7 +177,8 @@ enum HealthParser {
             let key = k.trimmingCharacters(in: .whitespaces)
             if ["日期", "date"].contains(key.lowercased()), let d = firstDate(v) { date = d; continue }
             if ["植物", "plant", "作物", "crop"].contains(key.lowercased()) { plant = v.trimmingCharacters(in: .whitespaces); continue }
-            guard let def = Metrics.match(key), metrics[def.key] == nil, let x = value(def.key, v) else { continue }
+            guard let def = Metrics.match(key), metrics[def.key] == nil, let x = value(def.key, v),
+                  Metrics.plausible[def.key]?.contains(x) ?? true else { continue }  // a typo or edited file is dropped
             metrics[def.key] = x
         }
         return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent, person: person(of: url), plant: plant)
