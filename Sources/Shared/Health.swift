@@ -92,6 +92,7 @@ struct DayRecord: Codable {
     var raw: String
     var file: String
     var person: String? = nil  // nil = you; from the file name health-<name>.txt
+    var plant: String? = nil  // garden plant named in the file ("植物: 番茄")
 }
 
 enum HealthParser {
@@ -139,6 +140,7 @@ enum HealthParser {
         var metrics: [String: Double] = [:]
         var date = fileDate(url) ?? dateFmt.string(from: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date())
         var pairs: [(String, String)] = []
+        var plant: String?
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             for (k, v) in obj { pairs.append((k, "\(v)")) }
         } else {
@@ -150,10 +152,11 @@ enum HealthParser {
         for (k, v) in pairs {
             let key = k.trimmingCharacters(in: .whitespaces)
             if ["日期", "date"].contains(key.lowercased()), let d = firstDate(v) { date = d; continue }
+            if ["植物", "plant", "作物", "crop"].contains(key.lowercased()) { plant = v.trimmingCharacters(in: .whitespaces); continue }
             guard let def = Metrics.match(key), metrics[def.key] == nil, let x = value(def.key, v) else { continue }
             metrics[def.key] = x
         }
-        return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent, person: person(of: url))
+        return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent, person: person(of: url), plant: plant)
     }
 
     static func fileDate(_ url: URL) -> String? { firstDate(url.lastPathComponent) }

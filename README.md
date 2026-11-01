@@ -137,6 +137,88 @@ Within a minute, **Source test** appears in the Mac menu. It lists every device 
   3. In their **Save File**, they choose the shared `HealthGlance` folder and the file name `health-<name>.txt`.
   4. The Mac app reads that folder too.
 
+## Garden PK
+
+Everyone who shares the `HealthGlance` folder grows a plant, and each day their Health numbers make it grow. One Mac writes a garden page into the shared folder. Anyone can open it in Finder, or in the Files app on an iPhone.
+
+<img src="docs/garden.png" width="640" alt="Garden page with three players">
+
+*Made-up players.*
+
+### How it works
+
+1. **Players.** Each player is a file `health-<name>.txt` in the shared folder. If you are the host, your own data is used too, under the name set in the menu.
+2. **Choosing a plant.** A player chooses a plant by adding a line such as `plant: tomato` or `植物: 番茄` to their file. The host chooses in the menu. The first plant named in a season is kept until the season ends.
+3. **The page.** On the host's Mac, turn on **Garden › Make the garden page on this Mac**. The page is rewritten only when someone's numbers change.
+4. **No AI.** The garden uses fixed formulas, so none of the players' numbers are sent to MiniMax for it.
+
+**Rules**
+
+| Element | Comes from | Full marks |
+|---|---|---|
+| ☀️ Sun | Steps | 10,000 steps |
+| 💧 Water | Sleep | 7–9 h; less for too little or too much |
+| 🌱 Nutrients | Active energy or exercise, whichever is higher | 500 kcal or 30 min |
+| 🍃 Calm | Resting heart rate compared with your own previous 7 days | At or below your own average |
+
+Each element scores from 0 to 1. Daily growth is 10 × the four elements weighted by your plant, so each day is worth at most 10 points.
+
+- **Missing measurements:** an element your devices do not measure counts as 0.5, so having no Apple Watch is not a penalty.
+- **Missing days:** a day without data adds nothing.
+- **Streaks:** three or more days in a row with at least 7 points earn 1 bonus point a day.
+- **Fairness:** heart rate is compared only with your own baseline, never with other players.
+
+| Plant | ☀️ | 💧 | 🌱 | 🍃 | Trait |
+|---|---|---|---|---|---|
+| 🍅 Tomato | 45% | 20% | 20% | 15% | Steps count most |
+| 🍉 Watermelon | 15% | 50% | 15% | 20% | Sleep counts most |
+| 🌻 Sunflower | 30% | 15% | 45% | 10% | Active energy and exercise count most |
+| 🥕 Carrot | 15% | 25% | 15% | 45% | A calm heart counts most |
+| 🍓 Strawberry | 25% | 25% | 25% | 25% | Balanced; double streak bonus |
+| 🎃 Pumpkin | 25% | 30% | 25% | 20% | ×0.8 for the first 7 days, ×1.3 after |
+
+The stages are Seed 0 → Sprout 8 → Seedling 25 → Leafy 45 → Blooming 70 → Fruiting 100 → Harvest 130 points. A season lasts 14 days, and a run of good days reaches Fruiting by the end. The highest score at the end of the season wins.
+
+### Set up for each player
+
+1. The host creates a folder named `HealthGlance` in iCloud Drive and shares it with each player, giving them permission to make changes.
+2. Each player builds this shortcut on their own iPhone. They paste the description into the Shortcuts app (iOS 27), replacing `<name>` and the plant with their own:
+
+```text
+Create a shortcut named "Garden Export" that does these steps in order:
+1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
+2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
+3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
+4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
+5. Make a Text with exactly these five lines, putting each result after its colon:
+plant: tomato
+steps: the result of step 1
+sleep: the result of step 2
+resting heart rate: the result of step 3
+active energy: the result of step 4
+6. Save File: save the text into the shared folder "HealthGlance" in iCloud Drive, as health-<name>.txt. Do not ask where to save. Overwrite the file if it exists.
+Do not use "in the last 1 day" for any date filter.
+```
+
+If the generated **Save File** action does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. Each player then runs the shortcut once by hand and adds an automation that runs it when they open an app every day, as in Step 5 above.
+
+### Notes
+
+- **One host only.** Only one Mac should make the page. If two Macs rewrite the same file in a shared folder, iCloud keeps conflicting copies.
+- **Language:** the page uses the host's language setting.
+- **Dates:** each day follows the host's time zone.
+- **Privacy:** everyone in the folder can see everyone's daily numbers.
+
+Garden settings in `config.json`:
+
+| Setting | Meaning |
+|---|---|
+| `gardenHost` | Whether this Mac makes the page |
+| `gardenName` | Your name on the page |
+| `gardenPlant` | Your plant |
+| `gardenDays` | Season length in days (default 14) |
+| `gardenStart` | First day of season 1, as `yyyy-MM-dd`; by default, the first day anyone has data |
+
 ## When summaries are made
 
 The Mac checks iCloud once a minute and writes a new summary when the numbers change. Automatic summaries are made at most once every 30 minutes. Each time the shortcut runs, the file is updated, so the summary follows your day. iCloud usually takes from a few seconds to a few minutes to bring a new file from the iPhone to the Mac.
@@ -173,6 +255,8 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli sample/2026-10-31.txt --generate    # also call MiniMax; prints, writes nothing
 ./build/healthwidget-cli --generate --save                   # newest data → summary.json, as the app does
 ./build/healthwidget-cli --sources                           # what the source test found
+./build/healthwidget-cli --garden                            # update the garden page now
+./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html
 ```
 
 Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read as well.
@@ -195,6 +279,7 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 | `Sources/Shared/CardView.swift` | The card UI, shared by the widget and the pinned card |
 | `Sources/App/Engine.swift` | MiniMax call and prompts (English and Chinese) |
 | `Sources/App/App.swift` | Menu-bar app: watching for data, generating, pinned card, launch at login |
+| `Sources/App/Garden.swift` | Garden PK: rules, ledger, garden page |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |
 | `Sources/CLI/main.swift` | Command-line test tool |
 | `build.sh` | Build, sign, install |

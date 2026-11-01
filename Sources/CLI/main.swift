@@ -1,11 +1,26 @@
 import Foundation
 
 // healthwidget-cli [file]: parse a health file (or your newest one in the inbox) and print what was read;
-// --sources prints the source test (sources.txt);
+// --sources prints the source test (sources.txt); --garden updates the garden page now; --garden-demo [--lang zh]
+// renders made-up players into build/garden-demo.html;
 // with --generate also call MiniMax and print the summary; add --save to write summary.json / history.json as the app does.
 
 let args = Array(CommandLine.arguments.dropFirst())
 L.lang = Config.load().language
+if args.contains("--garden-demo") {
+    // made-up players into build/garden-demo.html; the real ledger is not touched
+    let today = HealthParser.dateFmt.string(from: Date())
+    var cfg = Config.load()
+    if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    cfg.gardenName = "小雨"
+    let out = URL(fileURLWithPath: "build/garden-demo.html")
+    try! Garden.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
+    print(out.path); exit(0)
+}
+if args.contains("--garden") {
+    let page = Garden.update(cfg: Config.load())
+    print(page.map { "写入 \($0.path)" } ?? "没有变化：\(Garden.pageURL.path)"); exit(0)
+}
 if args.contains("--sources") {
     guard let r = Sources.latest() else { print("没有找到 sources.txt"); exit(1) }
     print("sources.txt 更新于 \(r.modified)")

@@ -21,6 +21,10 @@ final class Model: ObservableObject {
     @Published var lang = Config.load().language == "zh" ? "zh" : "en"
     @Published var panel = UserDefaults.standard.bool(forKey: "panel") { didSet { UserDefaults.standard.set(panel, forKey: "panel"); DesktopPanel.shared.show(panel, model: self) } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled
+    @Published var gardenHost = Config.load().gardenHost
+    @Published var gardenName = Config.load().gardenName
+    @Published var gardenPlant = Config.load().gardenPlant
+    @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL.path) ? Garden.pageURL : nil
     private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
 
@@ -53,6 +57,7 @@ final class Model: ObservableObject {
         Self.downloadPlaceholders()
         people = HealthParser.people()
         sources = Sources.latest()
+        updateGarden()
         guard !busy else { return }
         for key in [""] + people {
             let p = Self.person(key)
@@ -83,6 +88,23 @@ final class Model: ObservableObject {
             publishDisplay()
             check()
         }
+    }
+
+    func updateGarden() {
+        let cfg = Config.load()
+        guard cfg.gardenHost else { return }
+        Garden.update(cfg: cfg)
+        gardenPage = FileManager.default.fileExists(atPath: Garden.pageURL.path) ? Garden.pageURL : nil
+    }
+
+    func saveGarden() {
+        var c = Config.load()
+        let name = gardenName.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty, name != c.gardenName { Garden.rename(from: c.gardenName, to: name); c.gardenName = name }
+        c.gardenHost = gardenHost
+        c.gardenPlant = gardenPlant
+        try? c.save()
+        updateGarden()
     }
 
     /// Copy the chosen person's summary to display.json, which the widget reads.
@@ -185,6 +207,29 @@ struct MainView: View {
                     .font(.callout)
                     .padding(.top, 4)
                 }
+            }
+            DisclosureGroup(t("Garden", "菜园")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(t("Make the garden page on this Mac", "由这台 Mac 生成菜园页面"),
+                           isOn: Binding(get: { model.gardenHost }, set: { model.gardenHost = $0; model.saveGarden() }))
+                    HStack {
+                        Text(t("Your name", "你的名字"))
+                        TextField("", text: $model.gardenName).textFieldStyle(.roundedBorder).onSubmit { model.saveGarden() }
+                    }
+                    Picker(t("Your plant", "你的植物"), selection: Binding(get: { model.gardenPlant }, set: { model.gardenPlant = $0; model.saveGarden() })) {
+                        ForEach(Plant.all, id: \.id) { Text("\($0.emoji) \($0.name(model.lang))").tag($0.id) }
+                    }
+                    HStack {
+                        Button(t("Open Garden", "打开菜园")) { if let u = model.gardenPage { NSWorkspace.shared.open(u) } }
+                            .disabled(model.gardenPage == nil)
+                        Spacer()
+                    }
+                    Text(FileManager.default.fileExists(atPath: Garden.sharedFolder.path)
+                         ? t("The page is saved in iCloud Drive › HealthGlance, so everyone sharing the folder can open it.", "页面存在 iCloud 云盘 › HealthGlance，共享这个文件夹的人都能打开。")
+                         : t("Create a HealthGlance folder in iCloud Drive and share it; until then the page stays on this Mac.", "在 iCloud 云盘里建一个 HealthGlance 文件夹并共享；建好之前，页面只存在这台 Mac 上。"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {

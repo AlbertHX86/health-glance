@@ -6,7 +6,13 @@ struct Config: Codable {
     var baseURL = "https://api.minimaxi.com/v1"
     var model = "MiniMax-M3.1-Flash"
     var reasoningEffort = "low"  // the model always thinks; a daily note needs little of it
-    var language = "en"  // "en" or "zh": the app, the widget and the summary
+    var language = "en"  // "en" or "zh": the app, the widget, the summary and the garden page
+    // garden: only one Mac should host (write garden.html into the shared folder)
+    var gardenHost = false
+    var gardenName = NSFullUserName().isEmpty ? "Me" : NSFullUserName()
+    var gardenPlant = "strawberry"
+    var gardenDays = 14
+    var gardenStart: String? = nil  // yyyy-MM-dd; default: the first day anyone has data
 
     init() {}
 
@@ -19,6 +25,11 @@ struct Config: Codable {
         model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
         reasoningEffort = try c.decodeIfPresent(String.self, forKey: .reasoningEffort) ?? d.reasoningEffort
         language = try c.decodeIfPresent(String.self, forKey: .language) ?? d.language
+        gardenHost = try c.decodeIfPresent(Bool.self, forKey: .gardenHost) ?? d.gardenHost
+        gardenName = try c.decodeIfPresent(String.self, forKey: .gardenName) ?? d.gardenName
+        gardenPlant = try c.decodeIfPresent(String.self, forKey: .gardenPlant) ?? d.gardenPlant
+        gardenDays = max(3, try c.decodeIfPresent(Int.self, forKey: .gardenDays) ?? d.gardenDays)
+        gardenStart = try c.decodeIfPresent(String.self, forKey: .gardenStart) ?? d.gardenStart
     }
 
     static func load() -> Config {
