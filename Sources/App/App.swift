@@ -100,6 +100,21 @@ final class Model: ObservableObject {
         gardenPage = FileManager.default.fileExists(atPath: Garden.pageURL(cfg).path) ? Garden.pageURL(cfg) : nil
     }
 
+    /// Confirm, then start the game over for everyone.
+    func newGame() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = L.t("Start a new game?", "开始新游戏？")
+        alert.informativeText = L.t("Season 1 starts today and everyone gets a new egg. All progress so far is cleared (a copy of the old record is kept in the garden folder).",
+                                    "今天开始第 1 季，每个人都拿到一颗新蛋。之前所有人的进度清零（旧记录会备份在 garden 文件夹里）。")
+        alert.addButton(withTitle: L.t("New game", "新游戏"))
+        alert.addButton(withTitle: L.t("Cancel", "取消"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Garden.newGame()
+        updateGarden()
+        status = L.t("New game started: season 1, day 1", "新游戏已开始：第 1 季第 1 天")
+    }
+
     func saveGarden() {
         var c = Config.loadFile()
         let name = gardenName.trimmingCharacters(in: .whitespaces)
@@ -236,6 +251,8 @@ struct MainView: View {
                     HStack {
                         Button(t("Open Page", "打开页面")) { if let u = model.gardenPage { NSWorkspace.shared.open(u) } }
                             .disabled(model.gardenPage == nil)
+                        Button(t("New game", "新游戏")) { model.newGame() }
+                            .disabled(!model.gardenHost)
                         Spacer()
                     }
                     Divider()

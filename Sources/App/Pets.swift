@@ -132,7 +132,8 @@ struct Pet {
 
     /// The egg's contents are fixed by the owner and the season, so the same pet hatches on every render.
     static func hatch(_ owner: String, season: Int) -> Pet {
-        var r = RNG("puff|\(owner)|\(season)")
+        let g = Pets.game == 0 ? "" : "g\(Pets.game)|"  // game 0 keeps the original seeds
+        var r = RNG("puff|\(g)\(owner)|\(season)")
         let el = PetElement(rawValue: r.int(4))!
         let roll = r.int(100)
         let rarity = roll < 2 ? 3 : roll < 10 ? 2 : roll < 35 ? 1 : 0
@@ -149,7 +150,7 @@ struct Pet {
         var pet = Pet(owner: owner, element: el, rarity: rarity, species: species, zhName: zh[a] + zh[b], enName: en[a], body: body,
                       ears: r.int(4), pattern: r.int(4), tail: r.int(3), eyes: r.int(3), shiny: shiny, extra: extra)
         if let pack = Pets.pack {
-            var rs = RNG("sprite|\(owner)|\(season)")  // its own stream, so adding a pack does not change the rolls above
+            var rs = RNG("sprite|\(g)\(owner)|\(season)")  // its own stream, so adding a pack does not change the rolls above
             pet.sprite = pack.pick(rarity: rarity, &rs)
         }
         return pet
@@ -193,6 +194,8 @@ struct Battle {
 enum Pets {
     /// The sprite pack in use while a page is made (nil = the app's own drawings).
     static var pack: SpritePack?
+    /// The game in play while a page is made (`Config.gameID`); part of every egg's seed.
+    static var game = 0
 
     /// A short id for SVG gradients, unique per owner on the page.
     static func uid(_ s: String) -> String {
@@ -492,6 +495,7 @@ enum Pets {
 
     static func render(_ ledger: Ledger, cfg: Config, today: String, now: Date, sprites: Bool = true) -> String {
         pack = sprites ? SpritePack.load() : nil
+        game = cfg.gameID
         let lang = cfg.language == "zh" ? "zh" : "en"
         func t(_ en: String, _ zh: String) -> String { lang == "zh" ? zh : en }
         let (index, dates) = Garden.season(ledger, start: cfg.gardenStart, length: cfg.gardenDays, today: today)

@@ -11,6 +11,7 @@ if args.contains("--pets-demo") {
     let today = HealthParser.dateFmt.string(from: Date())
     var cfg = Config.load()
     if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    cfg.gameID = 0  // the demos keep the original rolls
     cfg.gardenName = "小雨"
     cfg.gardenStart = Garden.add(today, -8)
     let out = URL(fileURLWithPath: "build/pets-demo.html")
@@ -22,6 +23,7 @@ if args.contains("--pets-gallery") {
     let today = HealthParser.dateFmt.string(from: Date())
     var cfg = Config.load()
     if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    cfg.gameID = 0  // the demos keep the original rolls
     var wanted: [String: String] = [:]
     for n in 1...3000 {
         let pet = Pet.hatch("Player \(n)", season: 1)
@@ -43,11 +45,16 @@ if args.contains("--garden-demo") {
     let today = HealthParser.dateFmt.string(from: Date())
     var cfg = Config.load()
     if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    cfg.gameID = 0  // the demos keep the original rolls
     cfg.gardenName = "小雨"
     cfg.gardenStart = Garden.add(today, -8)
     let out = URL(fileURLWithPath: "build/garden-demo.html")
     try! Garden.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
     print(out.path); exit(0)
+}
+if args.contains("--new-game") {
+    let page = Garden.newGame()
+    print("新游戏 \(Config.loadFile().gameID)：" + (page?.path ?? Garden.pageURL().path)); exit(0)
 }
 if args.contains("--garden") {
     let page = Garden.update(cfg: Config.load())

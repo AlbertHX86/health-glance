@@ -322,6 +322,9 @@ The stages are Seed 0 → Sprout 8 → Seedling 25 → Leafy 45 → Blooming 70 
 | `gardenPlant` | Your plant (Garden) |
 | `gardenDays` | Season length in days (default 14) |
 | `gardenStart` | First day of season 1, as `yyyy-MM-dd`. It is filled in automatically the first time the game runs. |
+| `gameID` | Game number. **New game** raises it, so everyone's egg rolls again. |
+
+**Starting over.** Click **New game** in the menu's Game section (or run `./build/healthwidget-cli --new-game`). Season 1 starts today, everyone gets a new egg and all progress is cleared; the old record is kept as `garden/ledger-<time>.json`. Press it once everyone has joined, so all eggs start on the same day.
 
 ## When summaries are made
 
@@ -360,6 +363,7 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli --generate --save                   # newest data → summary.json, as the app does
 ./build/healthwidget-cli --sources                           # what the source test found
 ./build/healthwidget-cli --garden                            # update the game page now
+./build/healthwidget-cli --new-game                          # start over: season 1 from today, new eggs
 ./build/healthwidget-cli --pets-demo --lang en               # made-up players → build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang en            # one pet of each rarity → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html

@@ -204,7 +204,7 @@ enum Garden {
         // rewrite only when the page's inputs changed, so the shared folder is not touched every minute
         let enc = JSONEncoder()
         enc.outputFormatting = .sortedKeys  // dictionary order differs between runs; the comparison must not
-        let input = "\(cfg.gameMode)|\(cfg.gameMode == "pets" ? SpritePack.fingerprint() : "")|\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
+        let input = "\(cfg.gameMode)|\(cfg.gameMode == "pets" ? SpritePack.fingerprint() : "")|\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gameID)|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
         let page = pageURL(cfg)
         if (try? String(contentsOf: lastInputURL, encoding: .utf8)) == input, FileManager.default.fileExists(atPath: page.path) { return nil }
         let html = cfg.gameMode == "garden" ? render(ledger, cfg: cfg, today: today, now: Date()) : Pets.render(ledger, cfg: cfg, today: today, now: Date())
@@ -216,6 +216,25 @@ enum Garden {
     }
 
     /// Keep a player's history when they change their garden name.
+    /// Start over: season 1 begins today and everyone gets a new egg. The old ledger is kept as ledger-<time>.json.
+    @discardableResult
+    static func newGame(today: String = HealthParser.dateFmt.string(from: Date())) -> URL? {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: ledgerURL.path) {
+            let f = DateFormatter()
+            f.dateFormat = "yyyyMMdd-HHmmss"
+            try? fm.moveItem(at: ledgerURL, to: dir.appendingPathComponent("ledger-\(f.string(from: Date())).json"))
+        }
+        try? fm.removeItem(at: lastInputURL)
+        var c = Config.loadFile()
+        c.gardenStart = today  // not nil: a friend's latest file may be from yesterday, which would move day 1 back
+        c.gameID += 1
+        try? c.save()
+        var cfg = Config.load()
+        cfg.gardenStart = today
+        return update(cfg: cfg, today: today)
+    }
+
     static func rename(from old: String, to new: String) {
         var l = loadLedger()
         guard old != new, let days = l.players.removeValue(forKey: old) else { return }

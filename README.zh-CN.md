@@ -322,6 +322,9 @@ iOS 不允许分享自动化，所以第 4 步是每位玩家唯一要手动做�
 | `gardenPlant` | 你的植物（菜园） |
 | `gardenDays` | 每季天数，默认 14 |
 | `gardenStart` | 第 1 季的第一天，格式 `yyyy-MM-dd`。游戏第一次运行时会自动填上。 |
+| `gameID` | 第几局游戏。点「新游戏」会加 1，每个人的蛋重新随机。 |
+
+**从头开始：**点菜单 Game 里的「New game / 新游戏」（或运行 `./build/healthwidget-cli --new-game`）。今天开始第 1 季，每个人拿到一颗新蛋，之前的进度清零；旧记录备份为 `garden/ledger-<时间>.json`。最好等所有人都加入后再点，这样大家的蛋从同一天开始孵。
 
 ## 什么时候生成小结
 
@@ -360,6 +363,7 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
 ./build/healthwidget-cli --generate --save                   # 读最新数据，写入 summary.json，与程序相同
 ./build/healthwidget-cli --sources                           # 查看来源测试的结果
 ./build/healthwidget-cli --garden                            # 立即更新游戏页面
+./build/healthwidget-cli --new-game                          # 从头开始：今天起第 1 季，重新发蛋
 ./build/healthwidget-cli --pets-demo --lang zh               # 用虚构玩家生成 build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang zh            # 每种稀有度各一只 → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang zh             # 用虚构玩家生成 build/garden-demo.html
