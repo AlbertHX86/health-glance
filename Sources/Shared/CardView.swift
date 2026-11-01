@@ -110,6 +110,9 @@ struct CardView: View {
     let summary: Summary?
     let size: CardSize
     var lang: String = "en"
+    /// Set by the app (menu and desktop card): every tip shows and ticks on click. The widget leaves it nil and shows
+    /// the first three with their ticks.
+    var onToggle: ((String) -> Void)? = nil
 
     static let order = ["sleep_h", "steps", "resting_hr", "active_kcal", "exercise_min", "hrv", "stand_h", "distance_km", "hr", "spo2", "weight"]
 
@@ -197,15 +200,17 @@ struct CardView: View {
                 .padding(12)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 if !s.tips.isEmpty {
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(s.tips.prefix(3), id: \.self) { tip in
-                            Label {
-                                Text(tip).lineLimit(1)
-                            } icon: {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(onToggle == nil ? Array(s.tips.prefix(3)) : s.tips, id: \.self) { tip in
+                            if let onToggle {
+                                Button { onToggle(tip) } label: { tipRow(tip, s).contentShape(Rectangle()) }.buttonStyle(.plain)
+                            } else {
+                                tipRow(tip, s)
                             }
-                            .labelStyle(TightLabel())
-                            .font(.system(size: 12, weight: .medium))
+                        }
+                        if onToggle == nil, s.tips.count > 3 {
+                            Text(t("+\(s.tips.count - 3) more in the menu bar", "菜单栏里还有 \(s.tips.count - 3) 条"))
+                                .font(.system(size: 10)).foregroundStyle(.tertiary)
                         }
                     }
                 }
@@ -214,6 +219,17 @@ struct CardView: View {
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }
         }
+    }
+
+    func tipRow(_ tip: String, _ s: Summary) -> some View {
+        let done = s.done?.contains(tip) ?? false
+        return HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle").foregroundStyle(done ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+            Text(tip).lineLimit(onToggle == nil ? 1 : 2).strikethrough(done).foregroundStyle(done ? .secondary : .primary)
+                .fixedSize(horizontal: false, vertical: onToggle != nil)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 12, weight: .medium))
     }
 
     func dayLabel(_ d: String) -> String {
@@ -231,12 +247,14 @@ struct CardView: View {
 /// (the pinned desktop card and the menu-bar preview).
 struct WidgetFrame<Content: View>: View {
     let size: CardSize
+    var grows = false  // taller than the widget when the content needs it (all tips in the app)
     @ViewBuilder let content: Content
 
     var body: some View {
         content
             .padding(WidgetStyle.margin)
-            .frame(width: size.frame.width, height: size.frame.height)
+            .frame(width: size.frame.width)
+            .frame(minHeight: size.frame.height, maxHeight: grows ? nil : size.frame.height)
             .background(.background, in: RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous).strokeBorder(.separator.opacity(0.5), lineWidth: 0.5))
     }

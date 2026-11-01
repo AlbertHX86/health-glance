@@ -267,6 +267,10 @@ struct Summary: Codable {
     var error: String?
     var lang: String?  // language the text was written in; nil = before languages existed (Chinese)
     var person: String? = nil  // nil = you
+    var done: [String]? = nil  // tips ticked off today
+    var version: Int? = nil  // `Summary.current` when written; an older summary is made again
+
+    static let current = 2  // 2: four to six tips as a checklist
 
     static func load(_ person: String? = nil) -> Summary? { read(Paths.summary(person)) }
 

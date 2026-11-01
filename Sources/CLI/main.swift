@@ -3,6 +3,7 @@ import Foundation
 // healthwidget-cli [file]: parse a health file (or your newest one in the inbox) and print what was read;
 // --sources prints the source test (sources.txt); --garden updates the garden page now; --garden-demo [--lang zh]
 // renders made-up players into build/garden-demo.html;
+// --ask "question" answers a question about your data;
 // with --generate also call MiniMax and print the summary; add --save to write summary.json / history.json as the app does.
 
 let args = Array(CommandLine.arguments.dropFirst())
@@ -67,6 +68,17 @@ if args.contains("--sources") {
     guard let r = Sources.latest() else { print("没有找到 sources.txt"); exit(1) }
     print("sources.txt 更新于 \(r.modified)")
     for c in r.counts { print("  \(c.n)\t\(c.name)") }
+    exit(0)
+}
+if let i = args.firstIndex(of: "--ask"), i + 1 < args.count {
+    // --ask "question" [--person name]: answer a question about your data (or that person's)
+    let person = args.firstIndex(of: "--person").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+    let sem = DispatchSemaphore(value: 0)
+    Task {
+        do { print(try await Engine.ask(args[i + 1], person: person)) } catch { print("失败：\(error.localizedDescription)") }
+        sem.signal()
+    }
+    sem.wait()
     exit(0)
 }
 let file = args.first { !$0.hasPrefix("--") }.map { URL(fileURLWithPath: $0) }

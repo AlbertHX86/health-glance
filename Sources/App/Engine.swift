@@ -83,10 +83,10 @@ enum Engine {
     Rules:
     1. Use only the data given. Do not guess or invent missing metrics. Quote specific numbers and compare them with the 7-day average.
     2. With no history, judge against common adult ranges (about 7,000–10,000 steps a day, 7–9 hours of sleep, resting heart rate 50–80 bpm). Today's numbers may cover only part of the day: if steps are low, do not conclude anything; suggest how to use the rest of the day.
-    3. The headline must be specific and name the most notable item, not a generic title like "Daily health report". Tips must follow from the data and be doable right away, not generic advice like "keep a regular routine".
+    3. The headline must be specific and name the most notable item, not a generic title like "Daily health report". Tips must follow from the data and be doable right away, not generic advice like "keep a regular routine". Give 4 to 6 tips that cover different things (moving, sleep tonight, heart and recovery, the rest of today), most important first, each with a concrete time or amount. They form a checklist the user ticks off.
     4. Friendly, concise, never preachy. No medical diagnosis. If something is clearly off (for example resting heart rate 5+ bpm above average, or under 6 hours of sleep), mention it gently and suggest keeping an eye on it.
     5. Write in English only. Output one JSON object and nothing else:
-    {"headline": "a summary of at most 5 words", "summary": "2 to 3 sentences, at most 35 words in total", "tips": ["an action for today, at most 7 words; 1 to 3 tips"]}
+    {"headline": "a summary of at most 5 words", "summary": "2 to 3 sentences, at most 35 words in total", "tips": ["an action for the rest of today, at most 8 words; 4 to 6 tips"]}
     """
 
     static let systemZH = """
@@ -94,27 +94,31 @@ enum Engine {
     要求：
     1. 只依据给出的数据，缺失的指标不要猜测或编造；引用具体数字，并与 7 天平均对比。
     2. 没有历史数据时，参考一般成年人的常见范围评价（每天约 7000–10000 步、睡眠 7–9 小时、静息心率 50–80 次/分）。今天的数据可能只是截至目前，步数少时不要下定论，可以提醒剩下的时间怎么安排。
-    3. 标题要具体，点出今天最值得注意的一项，不要用「今日健康数据简报」这类空泛标题。建议要结合数据、可以马上做，不要「保持规律作息」这类泛泛之谈。
+    3. 标题要具体，点出今天最值得注意的一项，不要用「今日健康数据简报」这类空泛标题。建议要结合数据、可以马上做，不要「保持规律作息」这类泛泛之谈。给 4 到 6 条建议，覆盖不同方面（活动、今晚睡眠、心率与恢复、今天剩下的时间），最重要的放前面，每条带具体的时间或数量。这些建议是用户可以逐条打勾的清单。
     4. 语气友好、简洁，不说教。不做医学诊断；如果某项明显异常（例如静息心率比平均高 5 次/分以上、睡眠少于 6 小时），温和提醒并建议关注。
     5. 只输出一个 JSON 对象，不要其他文字：
-    {"headline": "一句话总结，不超过 14 个汉字", "summary": "2 到 3 句话，不超过 90 个汉字", "tips": ["今天可执行的建议，每条不超过 16 个汉字，1 到 3 条"]}
+    {"headline": "一句话总结，不超过 14 个汉字", "summary": "2 到 3 句话，不超过 90 个汉字", "tips": ["今天可执行的建议，每条不超过 16 个汉字，4 到 6 条"]}
     """
 
-    static func prompt(_ day: DayRecord, _ avg: [String: Double], _ days: Int, _ lang: String) -> String {
-        func line(_ m: [String: Double]) -> String {
-            Metrics.defs.compactMap { d in m[d.key].map { "\(d.name(lang)) \(Metrics.format(d.key, $0)) \(d.unit(lang))" } }
-                .joined(separator: lang == "zh" ? "；" : "; ")
-        }
+    static func line(_ m: [String: Double], _ lang: String) -> String {
+        Metrics.defs.compactMap { d in m[d.key].map { "\(d.name(lang)) \(Metrics.format(d.key, $0)) \(d.unit(lang))" } }
+            .joined(separator: lang == "zh" ? "；" : "; ")
+    }
+
+    static func prompt(_ day: DayRecord, _ avg: [String: Double], _ days: Int, _ lang: String, done: [String] = []) -> String {
+        func line(_ m: [String: Double]) -> String { Self.line(m, lang) }
         let now = Date().formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: lang == "zh" ? "zh_CN" : "en_US")))
         if lang != "zh" {
             var s = day.person.map { "This data belongs to \($0), who shares their Health data with the user. Write about \($0) in the third person.\n" } ?? ""
             s += "Date: \(day.date) (it is now \(now))\nParsed metrics: \(day.metrics.isEmpty ? "(none)" : line(day.metrics))\n"
             s += avg.isEmpty ? "Previous 7-day average: no history yet\n" : "Previous 7-day average (\(days) days with data): \(line(avg))\n"
+            if !done.isEmpty { s += "Already done today (do not suggest these again): \(done.joined(separator: "; "))\n" }
             return s + "Raw export:\n\(day.raw)"
         }
         var s = day.person.map { "这些数据属于「\($0)」，是对方共享给用户的。请用第三人称写「\($0)」。\n" } ?? ""
         s += "日期：\(day.date)（现在是 \(now)）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
         s += avg.isEmpty ? "过去 7 天平均：暂无历史数据\n" : "过去 7 天平均（共 \(days) 天有数据）：\(line(avg))\n"
+        if !done.isEmpty { s += "今天已经完成（不要再建议）：\(done.joined(separator: "；"))\n" }
         s += "原始导出内容：\n\(day.raw)"
         return s
     }
@@ -129,19 +133,56 @@ enum Engine {
         let avg = History.weekAverage(all, before: day.date)
         let days = all.filter { $0.date < day.date }.suffix(7).count
         let lang = cfg.language == "zh" ? "zh" : "en"
-        let reply = try await chat(cfg, lang == "zh" ? systemZH : systemEN, prompt(day, avg, days, lang))
+        // tips ticked earlier today stay on the list, ticked, and the model is told not to repeat them
+        let prev = Summary.load(day.person)
+        let done = prev?.date == day.date ? (prev?.done ?? []) : []
+        let reply = try await chat(cfg, lang == "zh" ? systemZH : systemEN, prompt(day, avg, days, lang, done: done))
         guard let obj = jsonObject(in: reply) else { throw EngineError.badReply(reply) }
+        let fresh = ((obj["tips"] as? [String]) ?? []).filter { !done.contains($0) }
         let s = Summary(
             date: day.date, generatedAt: Date(), model: cfg.model,
             headline: (obj["headline"] as? String) ?? (lang == "zh" ? "今日小结" : "Today"),
             summary: (obj["summary"] as? String) ?? reply,
-            tips: (obj["tips"] as? [String]) ?? [],
-            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang, person: day.person)
+            tips: Array((done + fresh).prefix(8)),
+            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang, person: day.person, done: done, version: Summary.current)
         if persist { try s.save() }
         return s
     }
 
     static func chat(_ cfg: Config, _ system: String, _ user: String) async throws -> String {
+        try await chat(cfg, messages: [["role": "system", "content": system], ["role": "user", "content": user]])
+    }
+
+    static let askEN = """
+    You are the user's personal health-data assistant. Answer the user's question from their Health data below: daily numbers for recent days and today's summary and checklist.
+    Rules: use only this data and general health knowledge, and say so when the data cannot answer. Quote specific numbers. At most 80 words, plain text, no tables. Friendly and concise. No medical diagnosis; for symptoms or worrying numbers, suggest seeing a doctor. Answer in English.
+    """
+    static let askZH = """
+    你是用户的私人健康数据助手。根据下面的健康数据回答用户的问题：最近几天每天的数字，以及今天的小结和清单。
+    要求：只依据这些数据和一般健康常识，数据回答不了时直说；引用具体数字；不超过 120 个汉字，纯文本，不用表格；语气友好、简洁；不做医学诊断，有症状或数字令人担心时建议就医。用简体中文回答。
+    """
+
+    /// Answer a question about one person's data (nil = you), continuing the conversation in `history`.
+    static func ask(_ question: String, history: [(q: String, a: String)] = [], person: String? = nil) async throws -> String {
+        let cfg = Config.load()
+        guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
+        let lang = cfg.language == "zh" ? "zh" : "en"
+        let zh = lang == "zh"
+        var ctx = person.map { zh ? "这些数据属于「\($0)」，是对方共享给用户的。\n" : "This data belongs to \($0), who shares it with the user.\n" } ?? ""
+        ctx += zh ? "最近每天的数据：\n" : "Daily numbers:\n"
+        for d in History.load(person).suffix(14) { ctx += "\(d.date): \(line(d.metrics, lang))\n" }
+        if let s = Summary.load(person) {
+            ctx += (zh ? "今天的小结（\(s.date)）：" : "Today's summary (\(s.date)): ") + "\(s.headline). \(s.summary)\n"
+            ctx += (zh ? "清单：" : "Checklist: ") + s.tips.map { ((s.done ?? []).contains($0) ? "[x] " : "[ ] ") + $0 }.joined(separator: "; ") + "\n"
+        }
+        let now = Date().formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: zh ? "zh_CN" : "en_US")))
+        var msgs: [[String: Any]] = [["role": "system", "content": (zh ? askZH : askEN) + (zh ? "\n现在是 \(now)。\n\n" : "\nIt is now \(now).\n\n") + ctx]]
+        for h in history.suffix(6) { msgs += [["role": "user", "content": h.q], ["role": "assistant", "content": h.a]] }
+        msgs.append(["role": "user", "content": question])
+        return try await chat(cfg, messages: msgs)
+    }
+
+    static func chat(_ cfg: Config, messages: [[String: Any]]) async throws -> String {
         var req = URLRequest(url: URL(string: cfg.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/chat/completions")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 120
@@ -149,7 +190,7 @@ enum Engine {
         req.setValue("Bearer \(cfg.apiKey)", forHTTPHeaderField: "Authorization")
         let body: [String: Any] = [
             "model": cfg.model,
-            "messages": [["role": "system", "content": system], ["role": "user", "content": user]],
+            "messages": messages,
             "max_tokens": 8192,  // includes the reasoning tokens
             "reasoning_effort": cfg.reasoningEffort,
         ]

@@ -12,6 +12,7 @@ final class Model: ObservableObject {
     @Published var summaries: [String: Summary] = [:]
     @Published var people: [String] = []
     @Published var selected = UserDefaults.standard.string(forKey: "person") ?? "" {
+        willSet { if newValue != selected { chat = [] } }
         didSet { UserDefaults.standard.set(selected, forKey: "person"); publishDisplay() }
     }
     @Published var sources = Sources.latest()
@@ -28,6 +29,15 @@ final class Model: ObservableObject {
     @Published var folderLink = Config.load().inviteFolderLink
     @Published var shortcutLink = Config.load().inviteShortcutLink
     @Published var myDevice = Config.load().myDevice
+    @Published var question = ""
+    @Published var chat: [QA] = []
+    @Published var asking = false
+
+    struct QA: Identifiable {
+        let id = UUID()
+        let q: String
+        var a: String
+    }
     @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL().path) ? Garden.pageURL() : nil
     private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
@@ -66,7 +76,8 @@ final class Model: ObservableObject {
         for key in [""] + people {
             let p = Self.person(key)
             guard let f = HealthParser.latestFile(person: p), let day = HealthParser.read(f) else { continue }
-            if let s = summaries[key] ?? Summary.load(p), s.error == nil, s.date == day.date, s.metrics == day.metrics, (s.lang ?? "zh") == lang {
+            if let s = summaries[key] ?? Summary.load(p), s.error == nil, s.date == day.date, s.metrics == day.metrics, (s.lang ?? "zh") == lang,
+               s.version == Summary.current {
                 summaries[key] = s
                 continue
             }
@@ -150,6 +161,35 @@ final class Model: ObservableObject {
     func publishDisplay() {
         if let s = summaries[selected] ?? summaries[""] { try? s.save(to: Paths.display) }
         WidgetCenter.shared.reloadAllTimelines()
+        DispatchQueue.main.async { DesktopPanel.shared.fit() }
+    }
+
+    /// Tick a tip of the summary shown, or untick it.
+    func toggleTip(_ tip: String) {
+        guard var s = summaries[selected] else { return }
+        var done = Set(s.done ?? [])
+        if !done.insert(tip).inserted { done.remove(tip) }
+        s.done = s.tips.filter { done.contains($0) }
+        summaries[selected] = s
+        try? s.save()
+        publishDisplay()
+    }
+
+    /// Ask about the data of the person shown; the conversation lasts until it is cleared or the person changes.
+    func ask() {
+        let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !asking else { return }
+        let history = chat.map { (q: $0.q, a: $0.a) }
+        let person = Self.person(selected)
+        question = ""
+        asking = true
+        chat.append(QA(q: q, a: "…"))
+        Task { @MainActor in
+            let a: String
+            do { a = try await Engine.ask(q, history: history, person: person) } catch { a = error.localizedDescription }
+            if !chat.isEmpty { chat[chat.count - 1].a = a }
+            asking = false
+        }
     }
 
     func saveKey() {
@@ -199,8 +239,11 @@ struct MainView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            WidgetFrame(size: .large) { CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) }
+            WidgetFrame(size: .large, grows: true) {
+                CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) { model.toggleTip($0) }
+            }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+            AskView(model: model)
             HStack(spacing: 8) {
                 Button {
                     model.generate()
@@ -350,7 +393,7 @@ final class DesktopPanel {
             w.backgroundColor = .clear
             w.hasShadow = true  // macOS traces the shadow from the card's rounded shape
             w.isMovableByWindowBackground = true
-            w.contentView = NSHostingView(rootView: PanelView(model: model))
+            w.contentView = FirstClickHostingView(rootView: PanelView(model: model))
             w.setFrameAutosaveName("HealthWidgetPanel")
             if !w.setFrameUsingName("HealthWidgetPanel"), let screen = NSScreen.main {
                 w.setFrameTopLeftPoint(NSPoint(x: screen.visibleFrame.maxX - size.width - 20, y: screen.visibleFrame.maxY - 20))
@@ -358,13 +401,71 @@ final class DesktopPanel {
             window = w
         }
         window?.orderFront(nil)
+        fit()
     }
+
+    /// Resize to the card (it grows with the number of tips), keeping the top edge where it is.
+    func fit() {
+        guard let w = window, let v = w.contentView else { return }
+        let size = v.fittingSize
+        guard size.height > 0, abs(size.height - w.frame.height) > 0.5 || abs(size.width - w.frame.width) > 0.5 else { return }
+        let top = w.frame.maxY
+        w.setFrame(NSRect(x: w.frame.minX, y: top - size.height, width: size.width, height: size.height), display: true)
+    }
+}
+
+/// Ticks a tip on the first click, without the click first activating the app.
+final class FirstClickHostingView<V: View>: NSHostingView<V> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 struct PanelView: View {
     @ObservedObject var model: Model
     var body: some View {
-        WidgetFrame(size: .large) { CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) }
+        WidgetFrame(size: .large, grows: true) {
+            CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) { model.toggleTip($0) }
+        }
+    }
+}
+
+/// Questions about the data shown, answered by the model from the recent days, the summary and the checklist.
+struct AskView: View {
+    @ObservedObject var model: Model
+    func t(_ en: String, _ zh: String) -> String { model.lang == "zh" ? zh : en }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !model.chat.isEmpty {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(model.chat) { qa in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(qa.q).font(.callout.weight(.semibold))
+                                    Text(qa.a).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .id(qa.id)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 220)
+                    .onChange(of: model.chat.last?.a) { _, _ in if let id = model.chat.last?.id { proxy.scrollTo(id, anchor: .bottom) } }
+                }
+            }
+            HStack(spacing: 6) {
+                TextField(t("Ask about your health…", "问问你的健康数据…"), text: $model.question)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.ask() }
+                    .disabled(model.asking)
+                if model.asking { ProgressView().controlSize(.small) }
+                if !model.chat.isEmpty && !model.asking {
+                    Button { model.chat = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                        .buttonStyle(.plain).help(t("Clear", "清空"))
+                }
+            }
+        }
     }
 }
 
