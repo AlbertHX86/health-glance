@@ -25,6 +25,8 @@ final class Model: ObservableObject {
     @Published var gardenName = Config.load().gardenName
     @Published var gardenPlant = Config.load().gardenPlant
     @Published var gameMode = Config.load().gameMode
+    @Published var folderLink = Config.load().inviteFolderLink
+    @Published var shortcutLink = Config.load().inviteShortcutLink
     @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL().path) ? Garden.pageURL() : nil
     private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
@@ -105,6 +107,8 @@ final class Model: ObservableObject {
         c.gardenHost = gardenHost
         c.gardenPlant = gardenPlant
         c.gameMode = gameMode
+        c.inviteFolderLink = folderLink.trimmingCharacters(in: .whitespacesAndNewlines)
+        c.inviteShortcutLink = shortcutLink.trimmingCharacters(in: .whitespacesAndNewlines)
         try? c.save()
         updateGarden()
     }
@@ -233,6 +237,25 @@ struct MainView: View {
                         Button(t("Open Page", "打开页面")) { if let u = model.gardenPage { NSWorkspace.shared.open(u) } }
                             .disabled(model.gardenPage == nil)
                         Spacer()
+                    }
+                    Divider()
+                    Text(t("Invite players", "邀请玩家")).font(.subheadline.weight(.semibold))
+                    Button(t("Create & show the shared folder", "创建并显示共享文件夹")) { Invite.revealFolder() }
+                    Text(t("In Finder, right-click HealthGlance › Share › Share Folder. Choose “Anyone with the link” and “Can make changes”, copy the link and paste it here.",
+                           "在访达里右键点 HealthGlance › 共享 › 共享文件夹，选「任何拥有链接的人」和「可以更改」，拷贝链接后粘贴到这里。"))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    TextField(t("Folder link (icloud.com/…)", "文件夹链接（icloud.com/…）"), text: $model.folderLink)
+                        .textFieldStyle(.roundedBorder).onSubmit { model.saveGarden() }
+                    TextField(t("Shortcut link (optional)", "快捷指令链接（可选）"), text: $model.shortcutLink)
+                        .textFieldStyle(.roundedBorder).onSubmit { model.saveGarden() }
+                    HStack {
+                        ForEach([("zh", "拷贝邀请（中文）"), ("en", "Copy invite (English)")], id: \.0) { l, label in
+                            Button(label) {
+                                model.saveGarden()
+                                Invite.copy(Invite.message(Config.load(), lang: l))
+                                model.status = t("Invite copied: paste it into WeChat or Messages", "邀请消息已拷贝，粘贴到微信或信息里发出去")
+                            }
+                        }
                     }
                     Text(FileManager.default.fileExists(atPath: Garden.sharedFolder.path)
                          ? t("The page is saved in iCloud Drive › HealthGlance, so everyone sharing the folder can open it.", "页面存在 iCloud 云盘 › HealthGlance，共享这个文件夹的人都能打开。")

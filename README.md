@@ -148,30 +148,48 @@ There are two games. Choose one in the menu under **Game**:
 
 Neither game uses AI, so no player's numbers are sent to MiniMax for it.
 
-### Set up for each player
+### Invite players
 
-1. The host creates a folder named `HealthGlance` in iCloud Drive and shares it with each player, giving them permission to make changes.
-2. Each player builds this shortcut on their own iPhone. They paste the description into the Shortcuts app (iOS 27), replacing `<name>` and the plant with their own:
+The invite is the iCloud share link of a folder named `HealthGlance`. Players join the folder, and their shortcut uploads into it automatically every day.
+
+**The host, on the Mac:**
+
+1. In the menu, open **Game** and click **Create & show the shared folder**. The app creates `HealthGlance` in iCloud Drive and shows it in Finder.
+2. In Finder, right-click the folder and choose **Share › Share Folder**. Choose **Anyone with the link** and **Can make changes**, then copy the link.
+3. Paste the link into **Folder link** in the menu.
+4. Optional: build the players' shortcut once on your iPhone, copy its iCloud link from the Shortcuts app, and paste it into **Shortcut link**. Without it, the invite carries a description that the Shortcuts app on iOS 27 turns into the shortcut.
+5. Click **拷贝邀请（中文）** or **Copy invite (English)** and send the message in WeChat or Messages.
+
+**Each player, on their iPhone:** they follow the message.
+
+1. Open the folder link to join the folder.
+2. Add the shortcut, from the shortcut link or by pasting the description.
+3. Run it once by hand to allow access to Health.
+4. Add an automation that runs it whenever they open an app they use every day.
+
+iOS does not let anyone share automations, so step 4 is the only one each player does by hand. After that, uploading is automatic.
+
+The shortcut is the same for everyone. It names the file after the phone (Settings › General › About › Name), so "Lin's iPhone" joins the game as "Lin". If two players' phones are both just called "iPhone", one of them should rename theirs.
+
+The players' shortcut description, also included in the invite:
 
 ```text
-Create a shortcut named "HealthGlance Export" that does these steps in order:
+Create a shortcut named "HealthGlance Upload" that does these steps in order:
 1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
 2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
 3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
 4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
-5. Make a Text with exactly these five lines, putting each result after its colon:
-plant: tomato
+5. Get Device Details: Device Name.
+6. Make a Text with exactly these four lines, putting each result after its colon:
 steps: the result of step 1
 sleep: the result of step 2
 resting heart rate: the result of step 3
 active energy: the result of step 4
-6. Save File: save the text into the shared folder "HealthGlance" in iCloud Drive, as health-<name>.txt. Do not ask where to save. Overwrite the file if it exists.
+7. Save File: save the text into the "HealthGlance" folder in iCloud Drive, named "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
 Do not use "in the last 1 day" for any date filter.
 ```
 
-If the generated **Save File** action does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. Each player then runs the shortcut once by hand and adds an automation that runs it when they open an app every day, as in Step 5 above.
-
-In Puff Battles the `plant:` line does nothing and can be left out.
+If the generated **Save File** does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. `./build/healthwidget-cli --invite` prints the invite message.
 
 ### Notes
 

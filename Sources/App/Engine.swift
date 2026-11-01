@@ -14,6 +14,8 @@ struct Config: Codable {
     var gardenPlant = "strawberry"
     var gardenDays = 14
     var gardenStart: String? = nil  // yyyy-MM-dd; default: the first day anyone has data
+    var inviteFolderLink = ""  // iCloud share link of the HealthGlance folder
+    var inviteShortcutLink = ""  // iCloud link of the players' shortcut
 
     init() {}
 
@@ -32,6 +34,8 @@ struct Config: Codable {
         gardenPlant = try c.decodeIfPresent(String.self, forKey: .gardenPlant) ?? d.gardenPlant
         gardenDays = max(3, try c.decodeIfPresent(Int.self, forKey: .gardenDays) ?? d.gardenDays)
         gardenStart = try c.decodeIfPresent(String.self, forKey: .gardenStart) ?? d.gardenStart
+        inviteFolderLink = try c.decodeIfPresent(String.self, forKey: .inviteFolderLink) ?? d.inviteFolderLink
+        inviteShortcutLink = try c.decodeIfPresent(String.self, forKey: .inviteShortcutLink) ?? d.inviteShortcutLink
     }
 
     static func load() -> Config {

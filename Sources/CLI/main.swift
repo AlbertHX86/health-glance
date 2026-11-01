@@ -53,6 +53,9 @@ if args.contains("--garden") {
     let page = Garden.update(cfg: Config.load())
     print(page.map { "写入 \($0.path)" } ?? "没有变化：\(Garden.pageURL().path)"); exit(0)
 }
+if args.contains("--invite") {
+    print(Invite.message(Config.load())); exit(0)
+}
 if args.contains("--sources") {
     guard let r = Sources.latest() else { print("没有找到 sources.txt"); exit(1) }
     print("sources.txt 更新于 \(r.modified)")

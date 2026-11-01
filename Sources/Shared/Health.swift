@@ -116,12 +116,15 @@ enum HealthParser {
         return out
     }
 
-    /// health-妈妈.txt → "妈妈"; health.txt or a dated file → nil (you).
+    /// health-妈妈.txt → "妈妈"; health.txt or a dated file → nil (you). The invite shortcut names files after the
+    /// phone, so "health-小林的iPhone.txt" → "小林" and "health-Lin’s iPhone.txt" → "Lin".
     static func person(of url: URL) -> String? {
         let name = url.deletingPathExtension().lastPathComponent
         guard let m = name.firstMatch(#"(?i)^health[-_ ](.+)$"#) else { return nil }
         let p = m[1].replacingOccurrences(of: "/", with: "_").trimmingCharacters(in: .whitespaces)
-        return p.isEmpty ? nil : p
+        let short = p.replacingOccurrences(of: #"(?i)\s*(的|’s|'s)?\s*(iphone|ipad)(\s*\(\d+\))?\s*$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+        return p.isEmpty ? nil : (short.isEmpty ? p : short)
     }
 
     /// Newest data file of one person (nil = you).
