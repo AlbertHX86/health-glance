@@ -268,6 +268,7 @@ struct Summary: Codable {
     var lang: String?  // language the text was written in; nil = before languages existed (Chinese)
     var person: String? = nil  // nil = you
     var done: [String]? = nil  // tips ticked off today
+    var added: [String]? = nil  // tips the user got by asking for suggestions or a plan; kept when the summary is rewritten
     var version: Int? = nil  // `Summary.current` when written; an older summary is made again
 
     static let current = 2  // 2: four to six tips as a checklist
@@ -317,15 +318,35 @@ enum History {
         return (try? JSONDecoder().decode([DayRecord].self, from: d)) ?? []
     }
 
+    static let keepDays = 800  // a little over two years, for the trend charts
+
     static func upsert(_ r: DayRecord) throws -> [DayRecord] {
         var all = load(r.person).filter { $0.date != r.date }
         all.append(r)
-        all.sort { $0.date < $1.date }
-        all = Array(all.suffix(30))
-        try FileManager.default.createDirectory(at: Paths.dir(r.person), withIntermediateDirectories: true)
+        return try save(all, person: r.person)
+    }
+
+    /// Add whole days from an import (the Health app's export). Its numbers win for the days it covers, except today,
+    /// which the shortcut keeps up to date; metrics the import lacks are kept.
+    static func merge(_ days: [DayRecord], person: String? = nil, today: String = HealthParser.dateFmt.string(from: Date())) throws -> [DayRecord] {
+        var byDate = Dictionary(load(person).map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+        for d in days where d.date < today {
+            if var old = byDate[d.date] {
+                old.metrics.merge(d.metrics) { _, new in new }
+                byDate[d.date] = old
+            } else {
+                byDate[d.date] = d
+            }
+        }
+        return try save(Array(byDate.values), person: person)
+    }
+
+    private static func save(_ days: [DayRecord], person: String?) throws -> [DayRecord] {
+        let all = Array(days.sorted { $0.date < $1.date }.suffix(keepDays))
+        try FileManager.default.createDirectory(at: Paths.dir(person), withIntermediateDirectories: true)
         let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(all).write(to: Paths.history(r.person), options: .atomic)
+        enc.outputFormatting = [.sortedKeys]
+        try enc.encode(all).write(to: Paths.history(person), options: .atomic)
         return all
     }
 

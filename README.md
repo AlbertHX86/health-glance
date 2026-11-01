@@ -16,12 +16,13 @@ Your iPhone Health data on your Mac desktop, summarised by AI every day: how you
 ### Features
 
 - **A daily AI summary.** A specific headline, two or three sentences and your key numbers: sleep, steps, resting heart rate, active energy, and more when the shortcut exports them. Each number is compared with your own 7-day average. MiniMax writes it in English or Chinese; switch with **Language** in the menu.
-- **Today's checklist.** Four to six concrete things to do, each with a time or an amount, such as "Walk 15 minutes after lunch, ~1,500 steps". Tick them off in the menu bar, on the desktop card or in the Dynamic Island. When the summary is rewritten later in the day, ticked items stay ticked and are not suggested again.
-- **Questions about your data.** Type a question such as "How many more steps to reach 8,000?" and get a short answer based on your last 14 days, today's summary and the checklist. Each question stands on its own.
+- **Suggestions you tick off.** Four to six concrete things to do, each with a time or an amount, such as "Walk 15 minutes after lunch, ~1,500 steps". Tick one in the menu bar, on the desktop card or in the Dynamic Island and it fades away. When the summary is rewritten later in the day, finished items are not suggested again.
+- **Questions about your data.** Type a question such as "How many more steps to reach 8,000?" and get a short answer based on your recent days, monthly averages, today's summary and the suggestions. Ask for advice or a plan ("Plan a better night's sleep"), and its steps join your suggestions. Ask to see something ("Show my sleep this year") and the chart switches to it. Each question stands on its own.
+- **Trend charts.** A line chart of any metric over a week, a month, three months, a year or two years, with the average, low and high. To fill it with your past, import the Health app's export once: years of data, read in one go.
 - **Three ways to show it on the desktop:**
   - a macOS **widget** in small, medium or large;
   - a **card** pinned to the desktop, which you can drag anywhere;
-  - a **Dynamic Island**: hidden until you point at the top centre of the screen. Then an icon and today's steps appear around the notch, or as a notch-shaped pill on screens without one. Click to open the card; click outside or press Esc to close it.
+  - a **Dynamic Island**: hidden until you point at the top centre of the screen you are using. Then an icon and today's steps appear around the notch, or as a notch-shaped pill on screens without one. Click to open the card, the question box and the chart; click outside or press Esc to close it.
 - **Always up to date.** The iPhone shortcut runs whenever you open an app you choose. The Mac checks iCloud once a minute and rewrites the summary when the numbers change, automatically at most every 30 minutes.
 - **Friends and family.** Everyone who shares a `HealthGlance` folder in iCloud Drive gets their own card and 7-day history. Choose whose card is shown in the menu.
 - **Games with friends.** Shared numbers become a game page that everyone opens from the folder. In **Puff Battles**, eggs hatch into random pets with rarities and skills, and the pets battle every day. In **Garden**, each player grows a plant. Invite players with a link, and start over at any time with **New game**.
@@ -130,6 +131,16 @@ Line names can be English or Chinese, for example `steps` or `步数`. Units are
 An app trigger is used instead of a time of day because a locked iPhone cannot read Health data, so a timed run often fails.
 
 Action names can differ slightly between iOS versions. If a filter is missing, skip it.
+
+### 3. Bring in your past data (optional)
+
+The shortcut adds one day at a time. For a longer history in the trend chart and in answers, import the Health app's own export once:
+
+1. On the iPhone, open **Health**, tap your picture at the top right and choose **Export All Health Data**. It can take a few minutes.
+2. Send `export.zip` to the Mac, for example with AirDrop.
+3. In the menu, open **Trends** and click **Import Health export…** (shown while there is little history), or run `./build/healthwidget-cli --import ~/Downloads/export.zip`.
+
+The zip is read without unpacking it. Steps, active energy, exercise, distance, stand hours, sleep, resting heart rate, HRV, blood oxygen and weight become one entry per day for the last two years. When an iPhone and an Apple Watch both count steps, the larger count is used rather than the sum. A night's sleep belongs to the day you wake up. The import never changes today, which the shortcut keeps up to date.
 
 ## Someone else's data
 
@@ -390,6 +401,7 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli --garden                            # update the game page now
 ./build/healthwidget-cli --new-game                          # start over: season 1 from today, new eggs
 ./build/healthwidget-cli --ask "How did I sleep this week?"  # ask a question about your data
+./build/healthwidget-cli --import ~/Downloads/export.zip     # add the Health app's export to your history
 ./build/healthwidget-cli --pets-demo --lang en               # made-up players → build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang en            # one pet of each rarity → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html
@@ -416,6 +428,8 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 | `Sources/App/Engine.swift` | MiniMax calls and prompts for summaries and questions (English and Chinese) |
 | `Sources/App/App.swift` | Menu-bar app: watching for data, generating, checklist, questions, pinned card, launch at login |
 | `Sources/App/Island.swift` | Dynamic Island at the top centre of the screen |
+| `Sources/App/Trends.swift` | Trend chart (Swift Charts) |
+| `Sources/App/HealthImport.swift` | Import of the Health app's export (export.zip or export.xml) |
 | `Sources/App/Garden.swift` | Games with friends: ledger, seasons, Garden rules and page |
 | `Sources/App/Pets.swift` | Puff Battles: hatching, skills, battles, page |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |

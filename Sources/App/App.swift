@@ -13,7 +13,18 @@ final class Model: ObservableObject {
     @Published var people: [String] = []
     @Published var selected = UserDefaults.standard.string(forKey: "person") ?? "" {
         willSet { if newValue != selected { answer = nil } }
-        didSet { UserDefaults.standard.set(selected, forKey: "person"); publishDisplay() }
+        didSet { UserDefaults.standard.set(selected, forKey: "person"); publishDisplay(); reloadHistory() }
+    }
+    /// The history of the person shown, for the trend chart.
+    @Published var history: [DayRecord] = []
+    @Published var trendMetric = UserDefaults.standard.string(forKey: "trendMetric") ?? "steps" {
+        didSet { UserDefaults.standard.set(trendMetric, forKey: "trendMetric") }
+    }
+    @Published var trendDays = UserDefaults.standard.object(forKey: "trendDays") as? Int ?? 30 {
+        didSet { UserDefaults.standard.set(trendDays, forKey: "trendDays") }
+    }
+    @Published var showTrends = UserDefaults.standard.object(forKey: "showTrends") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showTrends, forKey: "showTrends") }
     }
     @Published var sources = Sources.latest()
     @Published var status = ""
@@ -70,9 +81,38 @@ final class Model: ObservableObject {
     /// For you and each person with a file, generate when the newest numbers (or the chosen language) differ from the
     /// summary's. The shortcut rewrites the file on every app open, so automatic runs per person are at least 30 min
     /// apart; a manual run does not count. One generation at a time: each one ends by checking again.
+    func reloadHistory() { history = History.load(Self.person(selected)) }
+
+    /// Pick the Health app's export (export.zip, or the export.xml in it) and add its days to your history.
+    func importExport() {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.zip, .xml]
+        panel.message = L.t("Choose the Health export: on the iPhone, Health › your picture › Export All Health Data, then AirDrop or save export.zip to this Mac.",
+                            "选择健康导出文件：在 iPhone 上打开「健康」› 右上角头像 › 导出所有健康数据，再用隔空投送或存到这台 Mac。")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        status = L.t("Importing…", "正在导入…")
+        Task.detached {
+            let result: String
+            do {
+                let r = try HealthImport.run(url) { n in
+                    Task { @MainActor in self.status = L.t("Importing… \(n.formatted()) records", "正在导入… 已读 \(n.formatted()) 条记录") }
+                }
+                result = L.t("Imported \(r.days) days (\(r.first) – \(r.last))", "已导入 \(r.days) 天（\(r.first) 至 \(r.last)）")
+            } catch {
+                result = L.t("Import failed: ", "导入失败：") + error.localizedDescription
+            }
+            await MainActor.run {
+                self.status = result
+                self.reloadHistory()
+            }
+        }
+    }
+
     func check() {
         Self.downloadPlaceholders()
         people = HealthParser.people()
+        reloadHistory()
         sources = Sources.latest()
         updateGarden()
         guard !busy else { return }
@@ -172,6 +212,22 @@ final class Model: ObservableObject {
         Island.shared.show(display == "island", model: self)
     }
 
+    /// Put tasks from a question on that person's checklist; returns how many were new.
+    func addTasks(_ tasks: [String], person: String?) -> Int {
+        let key = person ?? ""
+        guard !tasks.isEmpty, var s = summaries[key] ?? Summary.load(person) else { return 0 }
+        let new = tasks.filter { !s.tips.contains($0) }
+        guard !new.isEmpty else { return 0 }
+        withAnimation(.easeOut(duration: 0.3)) {
+            s.tips += new
+            s.added = (s.added ?? []) + new
+            summaries[key] = s
+        }
+        try? s.save()
+        publishDisplay()
+        return new.count
+    }
+
     /// Tick a tip of the summary shown, or untick it.
     func toggleTip(_ tip: String) {
         guard var s = summaries[selected] else { return }
@@ -192,8 +248,18 @@ final class Model: ObservableObject {
         asking = true
         answer = QA(q: q, a: "…")
         Task { @MainActor in
-            let a: String
-            do { a = try await Engine.ask(q, person: person) } catch { a = error.localizedDescription }
+            var a: String
+            do {
+                let r = try await Engine.ask(q, person: person)
+                a = r.answer
+                let n = addTasks(r.tasks, person: person)
+                if n > 0 { a += "\n\n" + L.t("＋ Added \(n) to Suggestions", "＋ 已加入建议清单 \(n) 条") }
+                if let c = r.chart {
+                    trendMetric = c.metric
+                    trendDays = c.days
+                    showTrends = true
+                }
+            } catch { a = error.localizedDescription }
             if answer?.q == q { answer?.a = a }
             asking = false
         }
@@ -251,6 +317,9 @@ struct MainView: View {
             }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
             AskView(model: model)
+            DisclosureGroup(t("Trends", "趋势"), isExpanded: $model.showTrends) {
+                TrendsView(model: model).padding(.top, 6)
+            }
             HStack(spacing: 8) {
                 Button {
                     model.generate()
@@ -437,6 +506,7 @@ struct PanelView: View {
         WidgetFrame(size: .large, grows: true) {
             CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) { model.toggleTip($0) }
         }
+        .background(GeometryReader { g in Color.clear.onChange(of: g.size) { _, _ in DesktopPanel.shared.fit() } })
     }
 }
 
@@ -451,7 +521,8 @@ struct AskView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(qa.q).font(.callout.weight(.semibold))
-                        Text(qa.a).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text((try? AttributedString(markdown: qa.a, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(qa.a))
+                            .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

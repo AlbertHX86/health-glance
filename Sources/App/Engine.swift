@@ -112,13 +112,13 @@ enum Engine {
             var s = day.person.map { "This data belongs to \($0), who shares their Health data with the user. Write about \($0) in the third person.\n" } ?? ""
             s += "Date: \(day.date) (it is now \(now))\nParsed metrics: \(day.metrics.isEmpty ? "(none)" : line(day.metrics))\n"
             s += avg.isEmpty ? "Previous 7-day average: no history yet\n" : "Previous 7-day average (\(days) days with data): \(line(avg))\n"
-            if !done.isEmpty { s += "Already done today (do not suggest these again): \(done.joined(separator: "; "))\n" }
+            if !done.isEmpty { s += "Already done or planned today (do not suggest these again): \(done.joined(separator: "; "))\n" }
             return s + "Raw export:\n\(day.raw)"
         }
         var s = day.person.map { "这些数据属于「\($0)」，是对方共享给用户的。请用第三人称写「\($0)」。\n" } ?? ""
         s += "日期：\(day.date)（现在是 \(now)）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
         s += avg.isEmpty ? "过去 7 天平均：暂无历史数据\n" : "过去 7 天平均（共 \(days) 天有数据）：\(line(avg))\n"
-        if !done.isEmpty { s += "今天已经完成（不要再建议）：\(done.joined(separator: "；"))\n" }
+        if !done.isEmpty { s += "今天已经完成或已在计划中（不要再建议）：\(done.joined(separator: "；"))\n" }
         s += "原始导出内容：\n\(day.raw)"
         return s
     }
@@ -135,16 +135,18 @@ enum Engine {
         let lang = cfg.language == "zh" ? "zh" : "en"
         // tips ticked earlier today stay on the list, ticked, and the model is told not to repeat them
         let prev = Summary.load(day.person)
-        let done = prev?.date == day.date ? (prev?.done ?? []) : []
-        let reply = try await chat(cfg, lang == "zh" ? systemZH : systemEN, prompt(day, avg, days, lang, done: done))
+        let today = prev?.date == day.date
+        let done = today ? (prev?.done ?? []) : []
+        let added = today ? (prev?.added ?? []).filter { !done.contains($0) } : []  // from questions, still to do
+        let reply = try await chat(cfg, lang == "zh" ? systemZH : systemEN, prompt(day, avg, days, lang, done: done + added))
         guard let obj = jsonObject(in: reply) else { throw EngineError.badReply(reply) }
-        let fresh = ((obj["tips"] as? [String]) ?? []).filter { !done.contains($0) }
+        let fresh = ((obj["tips"] as? [String]) ?? []).filter { !done.contains($0) && !added.contains($0) }
         let s = Summary(
             date: day.date, generatedAt: Date(), model: cfg.model,
             headline: (obj["headline"] as? String) ?? (lang == "zh" ? "今日小结" : "Today"),
             summary: (obj["summary"] as? String) ?? reply,
-            tips: Array((done + fresh).prefix(8)),
-            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang, person: day.person, done: done, version: Summary.current)
+            tips: done + added + Array(fresh.prefix(6)),
+            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang, person: day.person, done: done, added: added, version: Summary.current)
         if persist { try s.save() }
         return s
     }
@@ -155,29 +157,65 @@ enum Engine {
 
     static let askEN = """
     You are the user's personal health-data assistant. Answer the user's question from their Health data below: daily numbers for recent days and today's summary and checklist.
-    Rules: use only this data and general health knowledge, and say so when the data cannot answer. Quote specific numbers. At most 80 words, plain text, no tables. Friendly and concise. No medical diagnosis; for symptoms or worrying numbers, suggest seeing a doctor. Answer in English.
+    Rules: use only this data and general health knowledge, and say so when the data cannot answer. Quote specific numbers. Friendly and concise. No medical diagnosis; for symptoms or worrying numbers, suggest seeing a doctor. Answer in English.
+    When the user asks for suggestions, advice or a plan, put the concrete steps in "tasks": 1 to 6 things to do today or tonight, each at most 8 words with a time or an amount, not already on the checklist. They are added to the user's checklist, so the answer only needs to introduce them briefly. For any other question, "tasks" is empty.
+    When the user asks to see, show, compare or chart a metric over time, also set "chart" to {"metric": one of steps, sleep_h, resting_hr, active_kcal, exercise_min, hrv, distance_km, stand_h, weight, "days": 7, 30, 90, 365 or 730}; the app draws it next to the answer. Otherwise leave "chart" out.
+    Output one JSON object and nothing else: {"answer": "plain text, at most 80 words", "tasks": ["..."], "chart": {...}}
     """
     static let askZH = """
     你是用户的私人健康数据助手。根据下面的健康数据回答用户的问题：最近几天每天的数字，以及今天的小结和清单。
-    要求：只依据这些数据和一般健康常识，数据回答不了时直说；引用具体数字；不超过 120 个汉字，纯文本，不用表格；语气友好、简洁；不做医学诊断，有症状或数字令人担心时建议就医。用简体中文回答。
+    要求：只依据这些数据和一般健康常识，数据回答不了时直说；引用具体数字；语气友好、简洁；不做医学诊断，有症状或数字令人担心时建议就医。用简体中文回答。
+    用户要建议、要计划时，把具体步骤放进 "tasks"：今天或今晚要做的 1 到 6 件事，每条不超过 16 个汉字，带时间或数量，不要和清单里已有的重复。这些会加进用户的清单，所以回答里简单介绍一下即可。其他问题 "tasks" 为空。
+    用户想看、比较某个指标随时间的变化，或者要画图时，再设置 "chart" 为 {"metric": steps、sleep_h、resting_hr、active_kcal、exercise_min、hrv、distance_km、stand_h、weight 之一, "days": 7、30、90、365 或 730}，App 会在回答旁边画出来。其他情况不要写 "chart"。
+    只输出一个 JSON 对象，不要其他文字：{"answer": "纯文本，不超过 120 个汉字", "tasks": ["..."], "chart": {...}}
     """
 
-    /// Answer one question about one person's data (nil = you); each question stands alone.
-    static func ask(_ question: String, person: String? = nil) async throws -> String {
+    /// Answer one question about one person's data (nil = you); each question stands alone. Asked for suggestions or a
+    /// plan, the model also returns tasks for the checklist.
+    struct Answer {
+        var answer: String
+        var tasks: [String] = []
+        var chart: (metric: String, days: Int)?
+    }
+
+    static func ask(_ question: String, person: String? = nil) async throws -> Answer {
         let cfg = Config.load()
         guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
         let lang = cfg.language == "zh" ? "zh" : "en"
         let zh = lang == "zh"
         var ctx = person.map { zh ? "这些数据属于「\($0)」，是对方共享给用户的。\n" : "This data belongs to \($0), who shares it with the user.\n" } ?? ""
+        let history = History.load(person)
+        // months before the last 30 days as monthly means, then the last 30 days one by one
+        let recent = history.suffix(30)
+        let older = Dictionary(grouping: history.dropLast(30)) { String($0.date.prefix(7)) }
+        if !older.isEmpty {
+            ctx += zh ? "更早的月平均：\n" : "Earlier monthly means:\n"
+            for (month, days) in older.sorted(by: { $0.key < $1.key }).suffix(24) {
+                var m: [String: Double] = [:]
+                for def in Metrics.defs {
+                    let xs = days.compactMap { $0.metrics[def.key] }
+                    if !xs.isEmpty { m[def.key] = xs.reduce(0, +) / Double(xs.count) }
+                }
+                ctx += "\(month) (\(days.count)\(zh ? " 天" : " days")): \(line(m, lang))\n"
+            }
+        }
         ctx += zh ? "最近每天的数据：\n" : "Daily numbers:\n"
-        for d in History.load(person).suffix(14) { ctx += "\(d.date): \(line(d.metrics, lang))\n" }
+        for d in recent { ctx += "\(d.date): \(line(d.metrics, lang))\n" }
         if let s = Summary.load(person) {
             ctx += (zh ? "今天的小结（\(s.date)）：" : "Today's summary (\(s.date)): ") + "\(s.headline). \(s.summary)\n"
             ctx += (zh ? "清单：" : "Checklist: ") + s.tips.map { ((s.done ?? []).contains($0) ? "[x] " : "[ ] ") + $0 }.joined(separator: "; ") + "\n"
         }
         let now = Date().formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: zh ? "zh_CN" : "en_US")))
         let msgs: [[String: Any]] = [["role": "system", "content": (zh ? askZH : askEN) + (zh ? "\n现在是 \(now)。\n\n" : "\nIt is now \(now).\n\n") + ctx]]
-        return try await chat(cfg, messages: msgs + [["role": "user", "content": question]])
+        let reply = try await chat(cfg, messages: msgs + [["role": "user", "content": question]])
+        guard let obj = jsonObject(in: reply), let answer = obj["answer"] as? String else { return Answer(answer: reply) }
+        let tasks = ((obj["tasks"] as? [String]) ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        var chart: (String, Int)?
+        if let c = obj["chart"] as? [String: Any], let m = c["metric"] as? String, Metrics.byKey[m] != nil {
+            let d = (c["days"] as? Int) ?? Int((c["days"] as? Double) ?? 30)
+            chart = (m, [7, 30, 90, 365, 730].min { abs($0 - d) < abs($1 - d) }!)  // the chart's ranges
+        }
+        return Answer(answer: answer, tasks: Array(tasks.prefix(6)), chart: chart)
     }
 
     static func chat(_ cfg: Config, messages: [[String: Any]]) async throws -> String {

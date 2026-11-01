@@ -110,6 +110,7 @@ struct CardView: View {
     let summary: Summary?
     let size: CardSize
     var lang: String = "en"
+    @State var leaving: Set<String> = []  // ticked a moment ago: shown ticked, then faded out
     /// Set by the app (menu and desktop card): every tip shows and ticks on click. The widget leaves it nil and shows
     /// the first three with their ticks.
     var onToggle: ((String) -> Void)? = nil
@@ -200,16 +201,31 @@ struct CardView: View {
                 .padding(12)
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 if !s.tips.isEmpty {
+                    let done = Set(s.done ?? [])
+                    let open = s.tips.filter { !done.contains($0) }
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(onToggle == nil ? Array(s.tips.prefix(3)) : s.tips, id: \.self) { tip in
-                            if let onToggle {
-                                Button { onToggle(tip) } label: { tipRow(tip, s).contentShape(Rectangle()) }.buttonStyle(.plain)
-                            } else {
-                                tipRow(tip, s)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(t("Suggestions", "建议")).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+                            if !done.isEmpty {
+                                Text(t("\(done.count) done", "已完成 \(done.count) 条")).font(.system(size: 10)).foregroundStyle(.tertiary)
                             }
                         }
-                        if onToggle == nil, s.tips.count > 3 {
-                            Text(t("+\(s.tips.count - 3) more in the menu bar", "菜单栏里还有 \(s.tips.count - 3) 条"))
+                        if open.isEmpty {
+                            Label(t("All done for today", "今天的建议都完成了"), systemImage: "checkmark.seal.fill")
+                                .font(.system(size: 12, weight: .medium)).foregroundStyle(.green)
+                        }
+                        ForEach(onToggle == nil ? Array(open.prefix(3)) : open, id: \.self) { tip in
+                            if let onToggle {
+                                Button { tick(tip, onToggle) } label: { tipRow(tip).contentShape(Rectangle()) }
+                                    .buttonStyle(.plain)
+                                    .transition(.opacity)
+                            } else {
+                                tipRow(tip)
+                            }
+                        }
+                        if onToggle == nil, open.count > 3 {
+                            Text(t("+\(open.count - 3) more in the menu bar", "菜单栏里还有 \(open.count - 3) 条"))
                                 .font(.system(size: 10)).foregroundStyle(.tertiary)
                         }
                     }
@@ -221,8 +237,18 @@ struct CardView: View {
         }
     }
 
-    func tipRow(_ tip: String, _ s: Summary) -> some View {
-        let done = s.done?.contains(tip) ?? false
+    /// Show the tick for a moment, then fade the tip out as it is marked done.
+    func tick(_ tip: String, _ onToggle: @escaping (String) -> Void) {
+        guard !leaving.contains(tip) else { return }
+        withAnimation(.easeOut(duration: 0.15)) { _ = leaving.insert(tip) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(.easeOut(duration: 0.4)) { onToggle(tip) }
+            leaving.remove(tip)
+        }
+    }
+
+    func tipRow(_ tip: String) -> some View {
+        let done = leaving.contains(tip)
         return HStack(alignment: .firstTextBaseline, spacing: 5) {
             Image(systemName: done ? "checkmark.circle.fill" : "circle").foregroundStyle(done ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
             Text(tip).lineLimit(onToggle == nil ? 1 : 2).strikethrough(done).foregroundStyle(done ? .secondary : .primary)
@@ -255,6 +281,7 @@ struct WidgetFrame<Content: View>: View {
             .padding(WidgetStyle.margin)
             .frame(width: size.frame.width)
             .frame(minHeight: size.frame.height, maxHeight: grows ? nil : size.frame.height)
+            .fixedSize(horizontal: false, vertical: grows)
             .background(.background, in: RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: WidgetStyle.cornerRadius, style: .continuous).strokeBorder(.separator.opacity(0.5), lineWidth: 0.5))
     }

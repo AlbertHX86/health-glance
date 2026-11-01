@@ -1,14 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// A Dynamic Island at the top centre of the screen. It stays hidden until the pointer rests there; then an icon and
-/// today's steps appear around the notch (or as a black pill of the same shape where there is no notch). A click opens
-/// it into the card with its checklist and the question box; a click outside, or Esc, closes it.
+/// A Dynamic Island at the top centre of the screen the pointer is on. It stays hidden until the pointer rests there;
+/// then an icon and today's steps appear around the notch (or as a black pill of the same shape where there is no
+/// notch). A click opens it into the card with its checklist, the question box and the trend chart; a click outside, or
+/// Esc, closes it.
 @MainActor
 final class Island: ObservableObject {
     static let shared = Island()
     @Published var expanded = false
     @Published var shown = false  // the small icon + number view, while the pointer is at the top centre
+    @Published var notch = CGSize(width: 0, height: 32)  // of the screen it is on
+    private var screen: NSScreen?
     private var panel: IslandPanel?
     private var monitors: [Any] = []
     private var poll: Timer?
@@ -32,12 +35,12 @@ final class Island: ObservableObject {
             p.ignoresMouseEvents = true  // while hidden, clicks reach the menu bar underneath
             p.contentView = FirstClickHostingView(rootView: IslandView(model: model, island: self))
             NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
-                Task { @MainActor in Island.shared.place() }
+                Task { @MainActor in Island.shared.move(to: Island.pointerScreen, force: true) }
             }
             panel = p
         }
         panel?.orderFrontRegardless()
-        place()
+        move(to: Self.pointerScreen, force: true)
         if poll == nil {
             // the pointer's position, ten times a second: mouse-moved events do not reliably arrive over the menu bar
             let t = Timer(timeInterval: 0.1, repeats: true) { _ in Task { @MainActor in Island.shared.track() } }
@@ -51,13 +54,14 @@ final class Island: ObservableObject {
 
     /// Where the pointer makes the island appear: the closed island plus a little margin.
     var zone: NSRect {
-        guard let s = Self.screen else { return .zero }
-        let w = Self.notch.width + 2 * IslandView.wing + 24, h = Self.notch.height + 8
+        guard let s = screen else { return .zero }
+        let w = notch.width + 2 * IslandView.wing + 24, h = notch.height + 8
         return NSRect(x: s.frame.midX - w / 2, y: s.frame.maxY - h, width: w, height: h)
     }
 
     func track() {
         guard !expanded else { return }
+        move(to: Self.pointerScreen)
         if zone.contains(NSEvent.mouseLocation) {
             hide?.cancel(); hide = nil
             setShown(true)
@@ -99,21 +103,43 @@ final class Island: ObservableObject {
         DispatchQueue.main.async { self.place() }
     }
 
+    private var closing = false
+
+    /// The island's content changed size (an answer arrived or was cleared, a tip faded out): fit the window to it.
+    func contentChanged() {
+        guard !closing else { return }
+        DispatchQueue.main.async { self.place() }
+    }
+
     func close() {
         guard expanded else { return }
+        closing = true  // keep the window until the card has animated back into the island
         expanded = false
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors = []
         // shrink the window once the card has animated back into the island
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { if !self.expanded { self.place(); self.track() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            self.closing = false
+            if !self.expanded { self.place(); self.track() }
+        }
     }
 
-    /// The screen with a notch if there is one, else the one with the menu bar.
-    static var screen: NSScreen? { NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.screens.first }
+    /// The screen under the pointer (each screen has its own menu bar, so the island goes where you are looking).
+    static var pointerScreen: NSScreen? {
+        let m = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(m, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens.first
+    }
+
+    /// Follow the pointer to another screen while closed.
+    func move(to s: NSScreen?, force: Bool = false) {
+        guard let s, force || s != screen else { return }
+        screen = s
+        notch = Self.notch(of: s)
+        DispatchQueue.main.async { self.place() }
+    }
 
     /// Width and height of the notch, or of a notch-like pill on a screen without one.
-    static var notch: CGSize {
-        guard let s = screen else { return CGSize(width: 0, height: 32) }
+    static func notch(of s: NSScreen) -> CGSize {
         if s.safeAreaInsets.top > 0, let l = s.auxiliaryTopLeftArea, let r = s.auxiliaryTopRightArea {
             return CGSize(width: s.frame.width - l.width - r.width, height: s.safeAreaInsets.top)
         }
@@ -123,7 +149,7 @@ final class Island: ObservableObject {
     /// Size the window to the island, centred under the notch at the top of the screen. The window changes size at
     /// once; SwiftUI animates the island inside it, pinned to the top centre, so the card always opens out of the island.
     func place() {
-        guard let p = panel, let s = Self.screen, let v = p.contentView else { return }
+        guard let p = panel, let s = screen, let v = p.contentView else { return }
         let size = v.fittingSize
         let x = (s.frame.midX - size.width / 2).rounded()
         p.setFrame(NSRect(x: x, y: s.frame.maxY - size.height, width: size.width, height: size.height), display: true)
@@ -147,7 +173,7 @@ struct IslandView: View {
     }
 
     var body: some View {
-        let notch = Island.notch
+        let notch = island.notch
         let visible = island.shown || island.expanded
         VStack(spacing: 0) {
             Button { island.toggle() } label: { HStack(spacing: 0) {
@@ -169,6 +195,7 @@ struct IslandView: View {
                     CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) { model.toggleTip($0) }
                         .frame(minHeight: CardSize.large.frame.height - 2 * WidgetStyle.margin, alignment: .top)
                     AskView(model: model)
+                    TrendsView(model: model)
                 }
                 .padding(.horizontal, WidgetStyle.margin + 2)
                 .padding(.top, 6)
@@ -178,6 +205,8 @@ struct IslandView: View {
             }
         }
         .frame(width: island.expanded ? CardSize.large.frame.width + 16 : notch.width + 2 * Self.wing)
+        .fixedSize(horizontal: false, vertical: true)  // as tall as its content, so it shrinks when an answer is cleared
+        .background(GeometryReader { g in Color.clear.onChange(of: g.size) { _, _ in island.contentChanged() } })
         .background(.black, in: UnevenRoundedRectangle(bottomLeadingRadius: island.expanded ? 30 : notch.height / 2,
                                                         bottomTrailingRadius: island.expanded ? 30 : notch.height / 2, style: .continuous))
         .environment(\.colorScheme, .dark)
