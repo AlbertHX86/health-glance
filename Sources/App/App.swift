@@ -175,6 +175,9 @@ struct MainView: View {
                         ForEach(Array(src.counts.prefix(10).enumerated()), id: \.offset) { _, c in
                             HStack { Text(c.name).lineLimit(1); Spacer(); Text("\(c.n)").monospacedDigit().foregroundStyle(.secondary) }
                         }
+                        if src.counts.isEmpty {
+                            Text(t("No samples matched.", "没有符合条件的记录。")).foregroundStyle(.secondary)
+                        }
                         Text(t("If someone else's device is listed, your iPhone can read their shared data.",
                                "列表里出现别人的设备，就说明 iPhone 能读到对方共享的数据。"))
                             .font(.caption).foregroundStyle(.secondary)

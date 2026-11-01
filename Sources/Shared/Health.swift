@@ -134,7 +134,8 @@ enum HealthParser {
     }
 
     static func read(_ url: URL) -> DayRecord? {
-        guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { return nil }
+        guard let data = try? Data(contentsOf: url), let raw = String(data: data, encoding: .utf8) else { return nil }
+        let text = plainText(raw)
         var metrics: [String: Double] = [:]
         var date = fileDate(url) ?? dateFmt.string(from: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date())
         var pairs: [(String, String)] = []
@@ -156,6 +157,19 @@ enum HealthParser {
     }
 
     static func fileDate(_ url: URL) -> String? { firstDate(url.lastPathComponent) }
+
+    /// Shortcuts sometimes saves rich text; keep only the visible text of an RTF file (an empty Text becomes an RTF
+    /// skeleton with no text at all).
+    static func plainText(_ s: String) -> String {
+        guard s.hasPrefix("{\\rtf") else { return s }
+        var t = s.replacingOccurrences(of: #"\{\\\*[^{}]*\}"#, with: "", options: .regularExpression)  // {\*\expandedcolortbl;;}
+        t = t.replacingOccurrences(of: #"\{\\(fonttbl|colortbl)[^{}]*(\{[^{}]*\}[^{}]*)*\}"#, with: "", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"\\(par|line)\b ?"#, with: "\n", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"\\'([0-9a-f]{2})"#, with: "", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"\\[a-z]+-?\d* ?"#, with: "", options: .regularExpression)
+        t = t.replacingOccurrences(of: "\\\n", with: "\n")
+        return t.replacingOccurrences(of: "[{}]", with: "", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     static func firstDate(_ s: String) -> String? {
         guard let r = s.range(of: #"\d{4}-\d{1,2}-\d{1,2}"#, options: .regularExpression) else { return nil }
@@ -303,9 +317,9 @@ enum Sources {
             guard let d = (try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
             return (u, d)
         }
-        guard let (url, modified) = found.max(by: { $0.1 < $1.1 }), let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        guard let (url, modified) = found.max(by: { $0.1 < $1.1 }), let raw = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         var n: [String: Int] = [:]
-        for line in text.components(separatedBy: .newlines) {
+        for line in HealthParser.plainText(raw).components(separatedBy: .newlines) {
             let name = line.trimmingCharacters(in: .whitespaces)
             if !name.isEmpty { n[name, default: 0] += 1 }
         }
