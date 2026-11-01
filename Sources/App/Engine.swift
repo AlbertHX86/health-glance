@@ -40,8 +40,10 @@ enum Engine {
     你是用户的私人健康数据助手。根据用户 iPhone「健康」App 导出的当日数据和过去 7 天的平均值，用简体中文写一份当日小结。
     要求：
     1. 只依据给出的数据，缺失的指标不要猜测或编造；引用具体数字，并与 7 天平均对比。
-    2. 语气友好、简洁，不说教。不做医学诊断；如果某项明显异常（例如静息心率比平均高 5 次/分以上、睡眠少于 6 小时），温和提醒并建议关注。
-    3. 只输出一个 JSON 对象，不要其他文字：
+    2. 没有历史数据时，参考一般成年人的常见范围评价（每天约 7000–10000 步、睡眠 7–9 小时、静息心率 50–80 次/分）。今天的数据可能只是截至目前，步数少时不要下定论，可以提醒剩下的时间怎么安排。
+    3. 标题要具体，点出今天最值得注意的一项，不要用「今日健康数据简报」这类空泛标题。建议要结合数据、可以马上做，不要「保持规律作息」这类泛泛之谈。
+    4. 语气友好、简洁，不说教。不做医学诊断；如果某项明显异常（例如静息心率比平均高 5 次/分以上、睡眠少于 6 小时），温和提醒并建议关注。
+    5. 只输出一个 JSON 对象，不要其他文字：
     {"headline": "一句话总结，不超过 14 个汉字", "summary": "2 到 3 句话，不超过 90 个汉字", "tips": ["今天可执行的建议，每条不超过 16 个汉字，1 到 3 条"]}
     """
 
@@ -49,7 +51,7 @@ enum Engine {
         func line(_ m: [String: Double]) -> String {
             Metrics.defs.compactMap { d in m[d.key].map { "\(d.name) \(Metrics.format(d.key, $0)) \(d.unit)" } }.joined(separator: "；")
         }
-        var s = "日期：\(day.date)\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
+        var s = "日期：\(day.date)（现在是 \(Date().formatted(date: .omitted, time: .shortened))）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
         s += avg.isEmpty ? "过去 7 天平均：暂无历史数据\n" : "过去 7 天平均（共 \(days) 天有数据）：\(line(avg))\n"
         s += "原始导出内容：\n\(day.raw)"
         return s

@@ -14,33 +14,35 @@ final class Model: ObservableObject {
     @Published var apiKey = Config.load().apiKey
     @Published var panel = UserDefaults.standard.bool(forKey: "panel") { didSet { UserDefaults.standard.set(panel, forKey: "panel"); DesktopPanel.shared.show(panel, model: self) } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled
-    private var lastAttempt = Date.distantPast
+    private var lastAuto = Date.distantPast
     private var timer: Timer?
 
     init() {
-        timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { _ in Task { @MainActor in self.check() } }
+        // iCloud delivers the iPhone's file some seconds to minutes after the shortcut runs; poll for it
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in Task { @MainActor in self.check() } }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in self.check() }
         }
         Task { @MainActor in
             DesktopPanel.shared.show(self.panel, model: self)
+            WidgetCenter.shared.reloadAllTimelines()  // summary.json may have been written by healthwidget-cli
             self.check()
         }
     }
 
-    /// Generate for a new day's data; the shortcut may rewrite the file many times a day, so the same day is
-    /// regenerated only when its numbers changed and the summary is 4 h old. At most one try per hour.
+    /// Generate whenever the newest file's numbers differ from the summary's. The shortcut rewrites the file on every
+    /// app open, so automatic runs are spaced at least 30 min apart; a manual run does not count towards that.
     func check() {
         Self.downloadPlaceholders()
         guard !busy, let f = HealthParser.latestFile(), let day = HealthParser.read(f) else { return }
-        if let s = summary, s.date == day.date, s.metrics == day.metrics || Date().timeIntervalSince(s.generatedAt) < 4 * 3600 { return }
-        if Date().timeIntervalSince(lastAttempt) < 3600 { return }
-        generate()
+        if let s = summary, s.error == nil, s.date == day.date, s.metrics == day.metrics { return }
+        if Date().timeIntervalSince(lastAuto) < 30 * 60 { return }
+        generate(auto: true)
     }
 
-    func generate() {
+    func generate(auto: Bool = false) {
         busy = true
-        lastAttempt = Date()
+        if auto { lastAuto = Date() }
         status = "正在生成…"
         Task { @MainActor in
             do {
@@ -58,7 +60,7 @@ final class Model: ObservableObject {
         var c = Config.load()
         c.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         do { try c.save(); status = "API Key 已保存" } catch { status = "保存失败：\(error.localizedDescription)"; return }
-        lastAttempt = .distantPast
+        lastAuto = .distantPast
         check()
     }
 
