@@ -2,36 +2,59 @@
 
 English | [中文](README.zh-CN.md)
 
-A macOS desktop widget that reads your iPhone Health data once a day and shows a short AI-written summary: how you slept, how much you moved, how today compares with your last 7 days, and one or two things to do next.
+Your iPhone Health data on your Mac desktop, summarised by AI every day: how you slept, how much you moved, how today compares with your last 7 days, and a checklist of what to do next.
 
 <p>
-  <img src="docs/widget-medium.png" width="380" alt="Medium widget">
-  <img src="docs/widget-large-dark.png" width="300" alt="Large widget, dark mode">
+  <img src="docs/widget-large-dark.png" width="330" alt="Large widget">
+  <img src="docs/island.png" width="360" alt="Dynamic Island, opened">
 </p>
 
-*The screenshots use made-up sample data.* The app and the summaries are in English or Chinese; switch with **Language** in the menu.
+*The screenshots use made-up sample data.*
 
-## How it works
+## Introduction
 
-macOS has no Health app, so a Mac cannot read Health data directly. An iPhone shortcut exports the numbers to iCloud Drive instead. A small menu-bar app on the Mac reads them, asks the MiniMax API for a summary, and the desktop widget shows the result.
+### Features
+
+- **A daily AI summary.** A specific headline, two or three sentences and your key numbers: sleep, steps, resting heart rate, active energy, and more when the shortcut exports them. Each number is compared with your own 7-day average. MiniMax writes it in English or Chinese; switch with **Language** in the menu.
+- **Today's checklist.** Four to six concrete things to do, each with a time or an amount, such as "Walk 15 minutes after lunch, ~1,500 steps". Tick them off in the menu bar, on the desktop card or in the Dynamic Island. When the summary is rewritten later in the day, ticked items stay ticked and are not suggested again.
+- **Questions about your data.** Type a question such as "How many more steps to reach 8,000?" and get a short answer based on your last 14 days, today's summary and the checklist. Each question stands on its own.
+- **Three ways to show it on the desktop:**
+  - a macOS **widget** in small, medium or large;
+  - a **card** pinned to the desktop, which you can drag anywhere;
+  - a **Dynamic Island**: hidden until you point at the top centre of the screen. Then an icon and today's steps appear around the notch, or as a notch-shaped pill on screens without one. Click to open the card; click outside or press Esc to close it.
+- **Always up to date.** The iPhone shortcut runs whenever you open an app you choose. The Mac checks iCloud once a minute and rewrites the summary when the numbers change, automatically at most every 30 minutes.
+- **Friends and family.** Everyone who shares a `HealthGlance` folder in iCloud Drive gets their own card and 7-day history. Choose whose card is shown in the menu.
+- **Games with friends.** Shared numbers become a game page that everyone opens from the folder. In **Puff Battles**, eggs hatch into random pets with rarities and skills, and the pets battle every day. In **Garden**, each player grows a plant. Invite players with a link, and start over at any time with **New game**.
+- **Careful with your data.** Health data stays in your iCloud Drive and on your Mac. Only the numbers go to MiniMax, for the summary and your questions; the games never send them. Impossible values, such as a typo or an edited file, are ignored. The API key stays in a local file.
+
+<p>
+  <img src="docs/island-closed.png" width="172" alt="Dynamic Island, closed">
+</p>
+
+### How it works
+
+macOS has no Health app, so a Mac cannot read Health data directly. An iPhone shortcut exports the numbers to iCloud Drive instead. A small menu-bar app on the Mac reads them, asks the MiniMax API for a summary, and shows the result on the desktop.
 
 ```
 iPhone shortcut ──writes──▶ iCloud Drive/Shortcuts/HealthWidget/health.txt
+                            (or the shared iCloud Drive/HealthGlance folder)
                                       │
 Mac menu-bar app ◀──reads─────────────┘ ──calls──▶ MiniMax (OpenAI-compatible API)
         │ writes ~/Library/Application Support/HealthWidget/summary.json
         ▼
-Desktop widget (small / medium / large), or a card pinned to the desktop
+Widget (small / medium / large), a card pinned to the desktop, or a Dynamic Island
 ```
 
-## Requirements
+## Installation
+
+### Requirements
 
 - A Mac with Apple Silicon, running macOS 14 Sonoma or later.
 - Xcode Command Line Tools. Install them with `xcode-select --install`. The full Xcode is not needed.
 - An iPhone with Health data. An Apple Watch is optional, but some metrics need one.
 - A MiniMax API key from [platform.minimaxi.com](https://platform.minimaxi.com) (China) or [platform.minimax.io](https://platform.minimax.io) (international).
 
-## Install on the Mac
+### 1. Install the Mac app
 
 ```bash
 git clone git@github.com:AlbertHX86/health-glance.git
@@ -40,15 +63,15 @@ cd health-glance
 ```
 
 1. Click the heart icon in the menu bar, paste your MiniMax API key and click **Save**.
-2. Right-click an empty part of the desktop, choose **Edit Widgets**, search for **HealthGlance** and drag it onto the desktop. It comes in small, medium and large.
-3. If the widget does not appear in the list, turn on **Pin card to desktop** in the menu instead. It shows the same card in a window that you can drag around.
+2. Choose how to show it with **On the desktop** in **Settings**: **Card**, **Dynamic Island** or **Off**.
+3. For the system widget, right-click an empty part of the desktop, choose **Edit Widgets**, search for **HealthGlance** and drag it onto the desktop. It comes in small, medium and large. If it is not in the list, use the card or the Dynamic Island instead.
 4. To start the app at login, turn on **Launch at login**.
 
-## Set up the iPhone shortcut (once)
+### 2. Set up the iPhone shortcut (once)
 
 You can let the iPhone build the shortcut from a description, or build it by hand. Either way, finish with Steps 4 and 5.
 
-### Quick way: describe it to your iPhone
+#### Quick way: describe it to your iPhone
 
 On iOS 27 with Apple Intelligence, the Shortcuts app can build a shortcut from a plain-language description. Tap **+** in the Shortcuts app and paste the text below:
 
@@ -69,7 +92,7 @@ Do not use "in the last 1 day" for any date filter.
 
 The generated shortcut is not always right, so before saving, compare it with Steps 1–3 below. Check the date filters most carefully. If your iPhone is set to Chinese, use the Chinese description in [README.zh-CN.md](README.zh-CN.md) instead. Then continue with Step 4.
 
-### By hand
+#### By hand
 
 **Step 1: Create the shortcut.** In the Shortcuts app, create a shortcut named `Health Export`. For each metric, add **Find Health Samples** with these filters, followed by the action in the last column:
 
@@ -98,7 +121,7 @@ Line names can be English or Chinese, for example `steps` or `步数`. Units are
 
 **Step 3: Save the file.** Add **Save File**. Turn off **Ask Where to Save**, set the subpath to `HealthWidget/health.txt` and turn on **Overwrite If File Exists**.
 
-### Finish (both ways)
+#### Finish (both ways)
 
 **Step 4: Run it once by hand.** The first time, the iPhone asks for permission to read each Health data type; allow them all. An automation cannot show these prompts, which is why the first run has to be manual.
 
@@ -366,6 +389,7 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli --sources                           # what the source test found
 ./build/healthwidget-cli --garden                            # update the game page now
 ./build/healthwidget-cli --new-game                          # start over: season 1 from today, new eggs
+./build/healthwidget-cli --ask "How did I sleep this week?"  # ask a question about your data
 ./build/healthwidget-cli --pets-demo --lang en               # made-up players → build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang en            # one pet of each rarity → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html
@@ -379,7 +403,7 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 |---|---|
 | Steps or sleep far too high | The shortcut uses **in the last 1 day**, or sleep includes **In Bed**. Use the filters in the table above. |
 | Numbers are higher than the Health app's | The iPhone and Apple Watch both recorded the same activity, and the shortcut adds them up. For sleep, add **Source is (your watch)**. |
-| The widget is not in the widget list | Use **Pin card to desktop**. |
+| The widget is not in the widget list | Choose **Card** or **Dynamic Island** under **On the desktop**. |
 | The menu says **No MiniMax API key yet** | No key has been saved. Paste it in the menu and click **Save**. |
 | The summary does not change | Check that `health.txt` updated in Files → iCloud Drive → Shortcuts → HealthWidget. |
 
@@ -389,8 +413,9 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 |---|---|
 | `Sources/Shared/Health.swift` | File locations, parser, summary and history cache |
 | `Sources/Shared/CardView.swift` | The card UI, shared by the widget and the pinned card |
-| `Sources/App/Engine.swift` | MiniMax call and prompts (English and Chinese) |
-| `Sources/App/App.swift` | Menu-bar app: watching for data, generating, pinned card, launch at login |
+| `Sources/App/Engine.swift` | MiniMax calls and prompts for summaries and questions (English and Chinese) |
+| `Sources/App/App.swift` | Menu-bar app: watching for data, generating, checklist, questions, pinned card, launch at login |
+| `Sources/App/Island.swift` | Dynamic Island at the top centre of the screen |
 | `Sources/App/Garden.swift` | Games with friends: ledger, seasons, Garden rules and page |
 | `Sources/App/Pets.swift` | Puff Battles: hatching, skills, battles, page |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |

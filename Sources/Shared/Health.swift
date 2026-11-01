@@ -300,11 +300,13 @@ struct Summary: Codable {
         if lang == "zh" {
             return Summary(date: "2026-10-31", generatedAt: Date(), model: "MiniMax-M3.1-Flash", headline: "睡得不错，活动略少",
                            summary: "昨晚睡了 7.4 小时，比近 7 天平均多 0.6 小时；步数 6,120，低于平均的 8,300。静息心率 58，平稳。",
-                           tips: ["午饭后走 15 分钟", "今晚 23:30 前上床"], metrics: m, weekAvg: avg, error: nil, lang: "zh")
+                           tips: ["午饭后快走 15 分钟，约 1500 步", "下午 4 点起身活动 5 分钟", "晚饭后散步 20 分钟补足步数", "22:30 放下手机，23:30 前上床", "睡前 5 分钟慢呼吸放松"],
+                           metrics: m, weekAvg: avg, error: nil, lang: "zh", done: ["午饭后快走 15 分钟，约 1500 步"], version: current)
         }
         return Summary(date: "2026-10-31", generatedAt: Date(), model: "MiniMax-M3.1-Flash", headline: "Slept well, moved less",
                        summary: "You slept 7.4 h, 0.6 h more than your 7-day average. Steps are at 6,120, below your usual 8,300. Resting HR is steady at 58.",
-                       tips: ["Take a 15-minute walk after lunch", "Aim for bed by 11:30 pm"], metrics: m, weekAvg: avg, error: nil, lang: "en")
+                       tips: ["Walk 15 minutes after lunch, ~1,500 steps", "Stand and stretch at 4 pm", "Evening walk of 20 minutes", "Phone down at 10:30, bed by 11:30", "Five minutes of slow breathing before bed"],
+                       metrics: m, weekAvg: avg, error: nil, lang: "en", done: ["Walk 15 minutes after lunch, ~1,500 steps"], version: current)
     }
 }
 

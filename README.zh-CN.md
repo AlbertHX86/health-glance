@@ -2,36 +2,59 @@
 
 [English](README.md) | 中文
 
-Mac 桌面小组件。每天读取 iPhone「健康」App 的数据，用 AI 写一段简短的小结，显示在桌面上。小结会说明睡得怎么样、活动量多少、和过去 7 天比如何，再给一两条马上能做的建议。
+把 iPhone「健康」App 的数据放到 Mac 桌面上，每天由 AI 写一段小结：睡得怎么样、活动量多少、和过去 7 天比如何，再给一份今天可以逐条打勾的清单。
 
 <p>
-  <img src="docs/widget-medium-zh.png" width="380" alt="中尺寸小组件">
-  <img src="docs/widget-large-dark-zh.png" width="300" alt="大尺寸小组件，深色模式">
+  <img src="docs/widget-large-dark-zh.png" width="330" alt="大尺寸小组件">
+  <img src="docs/island-zh.png" width="360" alt="展开的灵动岛">
 </p>
 
-*截图里是虚构的示例数据。*界面和小结支持英文和中文，默认英文，在菜单里的「Language」切换。
+*截图里是虚构的示例数据。*
 
-## 工作原理
+## 介绍
 
-macOS 没有「健康」App，Mac 不能直接读取健康数据。所以由 iPhone 的快捷指令把数字导出到 iCloud 云盘，Mac 上的菜单栏程序读取后调用 MiniMax 生成小结，再交给桌面小组件显示。
+### 功能
+
+- **每日 AI 小结：**一句具体的标题、两三句话，加上关键数字：睡眠、步数、静息心率、活动能量；快捷指令导出更多指标时也会显示。每个数字都和你自己过去 7 天的平均值对比。小结由 MiniMax 生成，支持中文和英文，在菜单的「Language」里切换。
+- **今日清单：**4 到 6 条具体的建议，每条都带时间或数量，例如「午饭后快走 15 分钟，约 1500 步」。在菜单栏、桌面卡片或灵动岛里都能逐条打勾。当天晚些时候小结重新生成时，已勾选的条目保持勾选，AI 也不会再重复建议。
+- **提问：**输入问题，比如「今天还要走多少步才到 8000？」，AI 会根据你最近 14 天的数据、今天的小结和清单给出简短回答。每次提问都是独立的。
+- **三种桌面显示方式：**
+  - macOS **小组件**，有小、中、大三种尺寸；
+  - 固定在桌面上的**卡片**，可以拖到任何位置；
+  - **灵动岛**：平时隐藏，鼠标移到屏幕顶部正中时，刘海两侧出现图标和今天的步数；没有刘海的屏幕上显示为一个刘海形状的黑色胶囊。点击展开卡片，点外面或按 Esc 收起。
+- **自动更新：**你每次打开指定的 App 时，iPhone 快捷指令会自动运行。Mac 每分钟检查一次 iCloud，数字一变就重新生成小结，自动生成最多每 30 分钟一次。
+- **家人和朋友：**共享 iCloud 云盘里 `HealthGlance` 文件夹的每个人，都有自己的卡片和 7 天历史，在菜单里选择显示谁的卡片。
+- **和朋友一起玩：**共享的数字会变成一个游戏页面，大家从文件夹里就能打开。「团团对战」里，蛋会孵出随机的宠物，有稀有度和技能，每天互相对战；「菜园」里，每人种一棵植物。用邀请链接拉朋友加入，随时可以点「新游戏」重新开始。
+- **数据安全：**健康数据只在你的 iCloud 云盘和 Mac 上。只有数字会发给 MiniMax，用来写小结和回答问题；游戏不会发送任何数据。明显不可能的数值（比如手误或手动改过的文件）会被忽略。API Key 只存在本地文件里。
+
+<p>
+  <img src="docs/island-closed-zh.png" width="172" alt="收起的灵动岛">
+</p>
+
+### 工作原理
+
+macOS 没有「健康」App，Mac 不能直接读取健康数据。所以由 iPhone 的快捷指令把数字导出到 iCloud 云盘，Mac 上的菜单栏程序读取后调用 MiniMax 生成小结，再显示在桌面上。
 
 ```
 iPhone 快捷指令 ──写入──▶ iCloud 云盘/快捷指令/HealthWidget/health.txt
+                         （或共享的 iCloud 云盘/HealthGlance 文件夹）
                                    │
 Mac 菜单栏程序 ◀──读取──────────────┘ ──调用──▶ MiniMax（OpenAI 兼容接口）
         │ 写入 ~/Library/Application Support/HealthWidget/summary.json
         ▼
-桌面小组件（小 / 中 / 大三种尺寸），或固定在桌面上的卡片
+小组件（小 / 中 / 大）、固定在桌面上的卡片，或灵动岛
 ```
 
-## 需要准备
+## 安装
+
+### 需要准备
 
 - Apple 芯片的 Mac，系统 macOS 14 Sonoma 或更新版本。
 - Xcode 命令行工具，用 `xcode-select --install` 安装。不需要完整的 Xcode。
 - 有健康数据的 iPhone。Apple Watch 不是必须的，但有些指标要靠它记录。
 - MiniMax API Key，在 [platform.minimaxi.com](https://platform.minimaxi.com)（国内站）或 [platform.minimax.io](https://platform.minimax.io)（国际站）申请。
 
-## 在 Mac 上安装
+### 1. 在 Mac 上安装
 
 ```bash
 git clone git@github.com:AlbertHX86/health-glance.git
@@ -40,15 +63,15 @@ cd health-glance
 ```
 
 1. 点菜单栏的心形图标，把「Language」切到「中文」。填入 MiniMax API Key，点「保存」。
-2. 在桌面空白处右键，选「编辑小组件」，搜索「HealthGlance」，拖到桌面上。有小、中、大三种尺寸。
-3. 如果小组件列表里找不到，就在菜单里打开「在桌面固定卡片」。它会用一个可拖动的窗口显示同样的卡片。
+2. 在「设置」的「桌面显示」里选择显示方式：「卡片」「灵动岛」或「不显示」。
+3. 想用系统小组件的话，在桌面空白处右键，选「编辑小组件」，搜索「HealthGlance」，拖到桌面上。有小、中、大三种尺寸。如果列表里找不到，就改用卡片或灵动岛。
 4. 想开机自动运行，打开「开机启动」。
 
-## 设置 iPhone 快捷指令（只需一次）
+### 2. 设置 iPhone 快捷指令（只需一次）
 
 快捷指令可以让 iPhone 根据文字描述自动生成，也可以手动搭建。两种方法做完后，都要接着做第 4、5 步。
 
-### 快速方法：用文字描述，让 iPhone 自动生成
+#### 快速方法：用文字描述，让 iPhone 自动生成
 
 iOS 27 搭配 Apple Intelligence 时，「快捷指令」App 可以根据一段文字描述自动生成快捷指令。在「快捷指令」App 里点「+」，粘贴下面这段话：
 
@@ -69,7 +92,7 @@ iOS 27 搭配 Apple Intelligence 时，「快捷指令」App 可以根据一段�
 
 自动生成的结果不一定完全正确。保存前，请和下面的第 1–3 步逐项对照，特别注意日期条件。如果 iPhone 的系统语言是英文，就用 [README.md](README.md) 里的英文描述。生成好之后，接着做第 4 步。
 
-### 手动搭建
+#### 手动搭建
 
 **第 1 步：新建快捷指令。**在「快捷指令」App 里新建一个快捷指令，命名为「健康导出」。每项指标先加一个「查找健康样本」，按表中条件设置，再加最后一列的动作：
 
@@ -98,7 +121,7 @@ iOS 27 搭配 Apple Intelligence 时，「快捷指令」App 可以根据一段�
 
 **第 3 步：存储文件。**加一个「存储文件」动作。关闭「询问存储位置」，子路径填 `HealthWidget/health.txt`，打开「覆盖原有文件」。
 
-### 收尾（两种方法都要做）
+#### 收尾（两种方法都要做）
 
 **第 4 步：先手动运行一次。**第一次运行时，iPhone 会逐项询问能否读取健康数据，全部允许。自动化运行时弹不出这些询问，所以第一次必须手动运行。
 
@@ -366,6 +389,7 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
 ./build/healthwidget-cli --sources                           # 查看来源测试的结果
 ./build/healthwidget-cli --garden                            # 立即更新游戏页面
 ./build/healthwidget-cli --new-game                          # 从头开始：今天起第 1 季，重新发蛋
+./build/healthwidget-cli --ask "这周睡得怎么样？"              # 问一个关于你数据的问题
 ./build/healthwidget-cli --pets-demo --lang zh               # 用虚构玩家生成 build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang zh            # 每种稀有度各一只 → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang zh             # 用虚构玩家生成 build/garden-demo.html
@@ -379,7 +403,7 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
 |---|---|
 | 步数或睡眠明显偏高 | 快捷指令用了「在最近 1 天」，或者睡眠把「在床上」也算进去了。按上面表格里的条件设置。 |
 | 数字比健康 App 里的高 | iPhone 和 Apple Watch 记录了同一段活动，快捷指令把两边加在了一起。睡眠可以加一个条件「来源 是 你的手表」。 |
-| 小组件列表里找不到 | 用「在桌面固定卡片」。 |
+| 小组件列表里找不到 | 在「桌面显示」里选「卡片」或「灵动岛」。 |
 | 菜单显示「还没有填 MiniMax API Key」 | 还没保存 Key。在菜单里粘贴后点「保存」。 |
 | 小结一直不变 | 打开「文件」App，在 iCloud 云盘 › 快捷指令 › HealthWidget 里看 health.txt 有没有更新。 |
 
@@ -389,8 +413,9 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
 |---|---|
 | `Sources/Shared/Health.swift` | 文件位置、数据解析、小结和历史缓存 |
 | `Sources/Shared/CardView.swift` | 卡片界面，小组件和桌面卡片共用 |
-| `Sources/App/Engine.swift` | MiniMax 调用与提示词（英文、中文各一份） |
-| `Sources/App/App.swift` | 菜单栏程序：监视数据、生成小结、桌面卡片、开机启动 |
+| `Sources/App/Engine.swift` | MiniMax 调用，小结和提问的提示词（英文、中文各一份） |
+| `Sources/App/App.swift` | 菜单栏程序：监视数据、生成小结、清单、提问、桌面卡片、开机启动 |
+| `Sources/App/Island.swift` | 屏幕顶部正中的灵动岛 |
 | `Sources/App/Garden.swift` | 和朋友一起玩：记录、赛季、菜园规则和页面 |
 | `Sources/App/Pets.swift` | 团团对战：孵化、技能、对战、页面 |
 | `Sources/Widget/Widget.swift` | WidgetKit 小组件 |
