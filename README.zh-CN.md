@@ -5,11 +5,11 @@
 Mac 桌面小组件。每天读取 iPhone「健康」App 的数据，用 AI 写一段简短的小结，显示在桌面上。小结会说明睡得怎么样、活动量多少、和过去 7 天比如何，再给一两条马上能做的建议。
 
 <p>
-  <img src="docs/widget-medium.png" width="380" alt="中尺寸小组件">
-  <img src="docs/widget-large-dark.png" width="300" alt="大尺寸小组件，深色模式">
+  <img src="docs/widget-medium-zh.png" width="380" alt="中尺寸小组件">
+  <img src="docs/widget-large-dark-zh.png" width="300" alt="大尺寸小组件，深色模式">
 </p>
 
-*截图里是虚构的示例数据。*
+*截图里是虚构的示例数据。*界面和小结支持英文和中文，默认英文，在菜单里的「Language」切换。
 
 ## 工作原理
 
@@ -39,8 +39,8 @@ cd health-glance
 ./build.sh install    # 编译、本地签名，安装到 ~/Applications 并启动
 ```
 
-1. 点菜单栏的心形图标，填入 MiniMax API Key，点「保存」。
-2. 在桌面空白处右键，选「编辑小组件」，搜索「健康小结」，拖到桌面上。
+1. 点菜单栏的心形图标，把「Language」切到「中文」。填入 MiniMax API Key，点「保存」。
+2. 在桌面空白处右键，选「编辑小组件」，搜索「HealthGlance」，拖到桌面上。有小、中、大三种尺寸。
 3. 如果小组件列表里找不到，就在菜单里打开「在桌面固定卡片」。它会用一个可拖动的窗口显示同样的卡片。
 4. 想开机自动运行，打开「开机启动」。
 
@@ -96,11 +96,12 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
   "apiKey": "<你的 MiniMax API Key>",
   "baseURL": "https://api.minimaxi.com/v1",
   "model": "MiniMax-M3.1-Flash",
-  "reasoningEffort": "low"
+  "reasoningEffort": "low",
+  "language": "zh"
 }
 ```
 
-用国际站时，把 `baseURL` 改成 `https://api.minimax.io/v1`。其他兼容 OpenAI 的接口和模型也可以用。环境变量 `MINIMAX_API_KEY` 会覆盖文件里的 Key，用命令行工具测试时方便。
+`language` 为 `en` 或 `zh`，菜单里的「Language」切换的就是它。用国际站时，把 `baseURL` 改成 `https://api.minimax.io/v1`。其他兼容 OpenAI 的接口和模型也可以用。环境变量 `MINIMAX_API_KEY` 会覆盖文件里的 Key，用命令行工具测试时方便。
 
 ## 隐私
 
@@ -134,7 +135,7 @@ Mac 每分钟检查一次 iCloud 里的文件，数字一变就重新生成小�
 |---|---|
 | `Sources/Shared/Health.swift` | 文件位置、数据解析、小结和历史缓存 |
 | `Sources/Shared/CardView.swift` | 卡片界面，小组件和桌面卡片共用 |
-| `Sources/App/Engine.swift` | MiniMax 调用与提示词 |
+| `Sources/App/Engine.swift` | MiniMax 调用与提示词（英文、中文各一份） |
 | `Sources/App/App.swift` | 菜单栏程序：监视数据、生成小结、桌面卡片、开机启动 |
 | `Sources/Widget/Widget.swift` | WidgetKit 小组件 |
 | `Sources/CLI/main.swift` | 命令行测试工具 |

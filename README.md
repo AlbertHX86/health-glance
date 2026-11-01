@@ -9,7 +9,7 @@ A macOS desktop widget that reads your iPhone Health data once a day and shows a
   <img src="docs/widget-large-dark.png" width="300" alt="Large widget, dark mode">
 </p>
 
-*The screenshots use made-up sample data.* The app UI and the summaries are in Chinese. To get them in another language, edit the prompt in `Sources/App/Engine.swift`.
+*The screenshots use made-up sample data.* The app and the summaries are in English or Chinese; switch with **Language** in the menu.
 
 ## How it works
 
@@ -39,10 +39,10 @@ cd health-glance
 ./build.sh install    # builds, signs locally, copies to ~/Applications and launches
 ```
 
-1. Click the heart icon in the menu bar, paste your MiniMax API key and click **保存** (Save).
-2. Right-click an empty part of the desktop, choose **Edit Widgets**, search for **健康小结** and drag it onto the desktop.
-3. If the widget does not appear in the list, turn on **在桌面固定卡片** (pin card to desktop) in the menu instead. It shows the same card in a window that you can drag around.
-4. To start the app at login, turn on **开机启动** (launch at login).
+1. Click the heart icon in the menu bar, paste your MiniMax API key and click **Save**.
+2. Right-click an empty part of the desktop, choose **Edit Widgets**, search for **HealthGlance** and drag it onto the desktop. It comes in small, medium and large.
+3. If the widget does not appear in the list, turn on **Pin card to desktop** in the menu instead. It shows the same card in a window that you can drag around.
+4. To start the app at login, turn on **Launch at login**.
 
 ## Set up the iPhone shortcut (once)
 
@@ -85,7 +85,7 @@ Action names can differ slightly between iOS versions. If a filter is missing, s
 
 The Mac checks iCloud once a minute and writes a new summary when the numbers change. Automatic summaries are made at most once every 30 minutes. Each time the shortcut runs, the file is updated, so the summary follows your day. iCloud usually takes from a few seconds to a few minutes to bring a new file from the iPhone to the Mac.
 
-To make a summary right away, click **立即生成** (generate now) in the menu.
+To make a summary right away, click **Generate Now** in the menu.
 
 ## Configuration
 
@@ -96,11 +96,12 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
   "apiKey": "<your MiniMax API key>",
   "baseURL": "https://api.minimaxi.com/v1",
   "model": "MiniMax-M3.1-Flash",
-  "reasoningEffort": "low"
+  "reasoningEffort": "low",
+  "language": "en"
 }
 ```
 
-For the international platform, set `baseURL` to `https://api.minimax.io/v1`. Any OpenAI-compatible endpoint and model also work. The environment variable `MINIMAX_API_KEY` overrides the key in the file, which is useful for the command-line tool.
+`language` is `en` or `zh`; the **Language** switch in the menu sets it. For the international platform, set `baseURL` to `https://api.minimax.io/v1`. Any OpenAI-compatible endpoint and model also work. The environment variable `MINIMAX_API_KEY` overrides the key in the file, which is useful for the command-line tool.
 
 ## Privacy
 
@@ -124,8 +125,8 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 |---|---|
 | Steps or sleep far too high | The shortcut uses **in the last 1 day**, or sleep includes **In Bed**. Use the filters in the table above. |
 | Numbers are higher than the Health app's | The iPhone and Apple Watch both recorded the same activity, and the shortcut adds them up. For sleep, add **Source is (your watch)**. |
-| The widget is not in the widget list | Use **在桌面固定卡片** (pin card to desktop). |
-| The menu says **还没有填 MiniMax API Key** | No key has been saved. Paste it in the menu and click **保存**. |
+| The widget is not in the widget list | Use **Pin card to desktop**. |
+| The menu says **No MiniMax API key yet** | No key has been saved. Paste it in the menu and click **Save**. |
 | The summary does not change | Check that `health.txt` updated in Files → iCloud Drive → Shortcuts → HealthWidget. |
 
 ## Project layout
@@ -134,7 +135,7 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 |---|---|
 | `Sources/Shared/Health.swift` | File locations, parser, summary and history cache |
 | `Sources/Shared/CardView.swift` | The card UI, shared by the widget and the pinned card |
-| `Sources/App/Engine.swift` | MiniMax call and prompt |
+| `Sources/App/Engine.swift` | MiniMax call and prompts (English and Chinese) |
 | `Sources/App/App.swift` | Menu-bar app: watching for data, generating, pinned card, launch at login |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |
 | `Sources/CLI/main.swift` | Command-line test tool |

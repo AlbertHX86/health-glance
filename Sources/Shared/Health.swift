@@ -22,25 +22,34 @@ enum Paths {
 }
 
 struct MetricDef {
-    let key: String, name: String, unit: String, aliases: [String]
+    let key: String, name: String, unit: String, en: String, enUnit: String, aliases: [String]
+
+    func name(_ lang: String) -> String { lang == "zh" ? name : en }
+    func unit(_ lang: String) -> String { lang == "zh" ? unit : enUnit }
+}
+
+/// UI and summary language, "en" or "zh" (config.json → language).
+enum L {
+    static var lang = "en"
+    static func t(_ en: String, _ zh: String) -> String { lang == "zh" ? zh : en }
 }
 
 enum Metrics {
     static let defs: [MetricDef] = [
-        MetricDef(key: "steps", name: "步数", unit: "步", aliases: ["步数", "steps", "step count", "step_count"]),
-        MetricDef(key: "distance_km", name: "步行跑步距离", unit: "公里",
+        MetricDef(key: "steps", name: "步数", unit: "步", en: "Steps", enUnit: "steps", aliases: ["步数", "steps", "step count", "step_count"]),
+        MetricDef(key: "distance_km", name: "步行跑步距离", unit: "公里", en: "Distance", enUnit: "km",
                   aliases: ["步行+跑步距离", "步行跑步距离", "步行与跑步距离", "距离", "walking running distance", "walking_running_distance", "distance"]),
-        MetricDef(key: "active_kcal", name: "活动能量", unit: "千卡",
+        MetricDef(key: "active_kcal", name: "活动能量", unit: "千卡", en: "Active energy", enUnit: "kcal",
                   aliases: ["活动能量", "动态能量", "活动卡路里", "active energy", "active_energy", "active calories"]),
-        MetricDef(key: "exercise_min", name: "锻炼", unit: "分钟",
+        MetricDef(key: "exercise_min", name: "锻炼", unit: "分钟", en: "Exercise", enUnit: "min",
                   aliases: ["锻炼分钟", "锻炼时间", "锻炼分钟数", "锻炼", "exercise minutes", "exercise", "apple_exercise_time"]),
-        MetricDef(key: "stand_h", name: "站立", unit: "小时", aliases: ["站立小时", "站立小时数", "站立", "stand hours", "apple_stand_hour"]),
-        MetricDef(key: "sleep_h", name: "睡眠", unit: "小时", aliases: ["睡眠时长", "睡眠", "sleep", "sleep_analysis", "sleep hours"]),
-        MetricDef(key: "resting_hr", name: "静息心率", unit: "次/分", aliases: ["静息心率", "resting heart rate", "resting_heart_rate"]),
-        MetricDef(key: "hrv", name: "心率变异性", unit: "毫秒", aliases: ["心率变异性", "hrv", "heart rate variability", "heart_rate_variability"]),
-        MetricDef(key: "hr", name: "平均心率", unit: "次/分", aliases: ["平均心率", "心率", "heart rate", "heart_rate"]),
-        MetricDef(key: "spo2", name: "血氧", unit: "%", aliases: ["血氧饱和度", "血氧", "oxygen saturation", "blood_oxygen_saturation", "spo2"]),
-        MetricDef(key: "weight", name: "体重", unit: "公斤", aliases: ["体重", "weight", "body mass", "body_mass"]),
+        MetricDef(key: "stand_h", name: "站立", unit: "小时", en: "Stand", enUnit: "h", aliases: ["站立小时", "站立小时数", "站立", "stand hours", "apple_stand_hour"]),
+        MetricDef(key: "sleep_h", name: "睡眠", unit: "小时", en: "Sleep", enUnit: "h", aliases: ["睡眠时长", "睡眠", "sleep", "sleep_analysis", "sleep hours"]),
+        MetricDef(key: "resting_hr", name: "静息心率", unit: "次/分", en: "Resting HR", enUnit: "bpm", aliases: ["静息心率", "resting heart rate", "resting_heart_rate"]),
+        MetricDef(key: "hrv", name: "心率变异性", unit: "毫秒", en: "HRV", enUnit: "ms", aliases: ["心率变异性", "hrv", "heart rate variability", "heart_rate_variability"]),
+        MetricDef(key: "hr", name: "平均心率", unit: "次/分", en: "Heart rate", enUnit: "bpm", aliases: ["平均心率", "心率", "heart rate", "heart_rate"]),
+        MetricDef(key: "spo2", name: "血氧", unit: "%", en: "SpO₂", enUnit: "%", aliases: ["血氧饱和度", "血氧", "oxygen saturation", "blood_oxygen_saturation", "spo2"]),
+        MetricDef(key: "weight", name: "体重", unit: "公斤", en: "Weight", enUnit: "kg", aliases: ["体重", "weight", "body mass", "body_mass"]),
     ]
     static let byKey = Dictionary(uniqueKeysWithValues: defs.map { ($0.key, $0) })
 
@@ -184,6 +193,7 @@ struct Summary: Codable {
     var metrics: [String: Double]
     var weekAvg: [String: Double]
     var error: String?
+    var lang: String?  // language the text was written in; nil = before languages existed (Chinese)
 
     static func load() -> Summary? {
         guard let d = try? Data(contentsOf: Paths.summary) else { return nil }
@@ -200,12 +210,19 @@ struct Summary: Codable {
         try enc.encode(self).write(to: Paths.summary, options: .atomic)
     }
 
-    static let placeholder = Summary(
-        date: "2026-10-31", generatedAt: Date(), model: "MiniMax-M3.1-Flash", headline: "睡得不错，活动略少",
-        summary: "昨晚睡了 7.4 小时，比近 7 天平均多 0.6 小时；步数 6,120，低于平均的 8,300。静息心率 58，平稳。",
-        tips: ["午饭后走 15 分钟", "今晚 23:30 前上床"],
-        metrics: ["steps": 6120, "sleep_h": 7.4, "resting_hr": 58, "active_kcal": 410, "exercise_min": 22, "hrv": 46],
-        weekAvg: ["steps": 8300, "sleep_h": 6.8, "resting_hr": 59, "active_kcal": 480, "exercise_min": 30, "hrv": 44], error: nil)
+    /// Made-up numbers for the widget gallery preview and the README screenshots.
+    static func placeholder(_ lang: String) -> Summary {
+        let m: [String: Double] = ["steps": 6120, "sleep_h": 7.4, "resting_hr": 58, "active_kcal": 410, "exercise_min": 22, "hrv": 46]
+        let avg: [String: Double] = ["steps": 8300, "sleep_h": 6.8, "resting_hr": 59, "active_kcal": 480, "exercise_min": 30, "hrv": 44]
+        if lang == "zh" {
+            return Summary(date: "2026-10-31", generatedAt: Date(), model: "MiniMax-M3.1-Flash", headline: "睡得不错，活动略少",
+                           summary: "昨晚睡了 7.4 小时，比近 7 天平均多 0.6 小时；步数 6,120，低于平均的 8,300。静息心率 58，平稳。",
+                           tips: ["午饭后走 15 分钟", "今晚 23:30 前上床"], metrics: m, weekAvg: avg, error: nil, lang: "zh")
+        }
+        return Summary(date: "2026-10-31", generatedAt: Date(), model: "MiniMax-M3.1-Flash", headline: "Slept well, moved less",
+                       summary: "You slept 7.4 h, 0.6 h more than your 7-day average. Steps are at 6,120, below your usual 8,300. Resting HR is steady at 58.",
+                       tips: ["Take a 15-minute walk after lunch", "Aim for bed by 11:30 pm"], metrics: m, weekAvg: avg, error: nil, lang: "en")
+    }
 }
 
 /// Past days, one record per date, newest last; kept to 30 days.

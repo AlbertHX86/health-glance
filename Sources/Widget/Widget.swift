@@ -9,10 +9,10 @@ struct Entry: TimelineEntry {
 }
 
 struct Provider: TimelineProvider {
-    func placeholder(in context: Context) -> Entry { Entry(date: Date(), summary: .placeholder) }
+    func placeholder(in context: Context) -> Entry { Entry(date: Date(), summary: .placeholder("en")) }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
-        completion(Entry(date: Date(), summary: Summary.load() ?? .placeholder))
+        completion(Entry(date: Date(), summary: Summary.load() ?? .placeholder("en")))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
@@ -27,7 +27,7 @@ struct HealthWidgetView: View {
 
     var body: some View {
         let size: CardSize = family == .systemSmall ? .small : (family == .systemMedium ? .medium : .large)
-        CardView(summary: entry.summary, size: size)
+        CardView(summary: entry.summary, size: size, lang: entry.summary?.lang ?? "en")
             .containerBackground(.background, for: .widget)
     }
 }
@@ -35,8 +35,8 @@ struct HealthWidgetView: View {
 struct HealthWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "HealthSummary", provider: Provider()) { HealthWidgetView(entry: $0) }
-            .configurationDisplayName("健康小结")
-            .description("每天读取「健康」数据，由 MiniMax 生成小结。")
+            .configurationDisplayName("HealthGlance")
+            .description("A daily AI summary of your iPhone Health data.")
             .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

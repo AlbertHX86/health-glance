@@ -5,7 +5,7 @@
 	<key>CFBundleIdentifier</key><string>com.alberthx.healthwidget</string>
 	<key>CFBundleExecutable</key><string>HealthWidget</string>
 	<key>CFBundleName</key><string>HealthWidget</string>
-	<key>CFBundleDisplayName</key><string>健康小结</string>
+	<key>CFBundleDisplayName</key><string>HealthGlance</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>CFBundleVersion</key><string>1</string>

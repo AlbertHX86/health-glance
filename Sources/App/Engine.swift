@@ -1,11 +1,25 @@
 import Foundation
 
-/// API settings in ~/Library/Application Support/HealthWidget/config.json (mode 600); MINIMAX_API_KEY in the environment wins.
+/// Settings in ~/Library/Application Support/HealthWidget/config.json (mode 600); MINIMAX_API_KEY in the environment wins.
 struct Config: Codable {
-    var apiKey: String = ""
-    var baseURL: String = "https://api.minimaxi.com/v1"
-    var model: String = "MiniMax-M3.1-Flash"
-    var reasoningEffort: String = "low"  // the model always thinks; a daily note needs little of it
+    var apiKey = ""
+    var baseURL = "https://api.minimaxi.com/v1"
+    var model = "MiniMax-M3.1-Flash"
+    var reasoningEffort = "low"  // the model always thinks; a daily note needs little of it
+    var language = "en"  // "en" or "zh": the app, the widget and the summary
+
+    init() {}
+
+    /// Missing keys keep their defaults, so a config written by an older version still loads (and keeps its key).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Config()
+        apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? d.apiKey
+        baseURL = try c.decodeIfPresent(String.self, forKey: .baseURL) ?? d.baseURL
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? d.model
+        reasoningEffort = try c.decodeIfPresent(String.self, forKey: .reasoningEffort) ?? d.reasoningEffort
+        language = try c.decodeIfPresent(String.self, forKey: .language) ?? d.language
+    }
 
     static func load() -> Config {
         var c = (try? Data(contentsOf: Paths.config)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) } ?? Config()
@@ -26,17 +40,28 @@ enum EngineError: LocalizedError {
     case noKey, noData, http(Int, String), badReply(String), truncated
     var errorDescription: String? {
         switch self {
-        case .noKey: return "还没有填 MiniMax API Key"
-        case .noData: return "没有找到健康数据文件（iCloud 云盘 › 快捷指令 › HealthWidget）"
-        case let .http(code, body): return "MiniMax 接口返回 \(code)：\(body.prefix(200))"
-        case let .badReply(s): return "模型回复无法解析：\(s.prefix(200))"
-        case .truncated: return "模型思考过长，回复被截断，请再试一次"
+        case .noKey: return L.t("No MiniMax API key yet", "还没有填 MiniMax API Key")
+        case .noData: return L.t("No health data file found (iCloud Drive › Shortcuts › HealthWidget)", "没有找到健康数据文件（iCloud 云盘 › 快捷指令 › HealthWidget）")
+        case let .http(code, body): return L.t("MiniMax returned \(code): ", "MiniMax 接口返回 \(code)：") + body.prefix(200)
+        case let .badReply(s): return L.t("Could not read the model's reply: ", "模型回复无法解析：") + s.prefix(200)
+        case .truncated: return L.t("The model thought too long and the reply was cut off; try again", "模型思考过长，回复被截断，请再试一次")
         }
     }
 }
 
 enum Engine {
-    static let system = """
+    static let systemEN = """
+    You are the user's personal health-data assistant. From today's numbers, exported from the iPhone Health app, and the average of the previous 7 days, write a short daily summary in English.
+    Rules:
+    1. Use only the data given. Do not guess or invent missing metrics. Quote specific numbers and compare them with the 7-day average.
+    2. With no history, judge against common adult ranges (about 7,000–10,000 steps a day, 7–9 hours of sleep, resting heart rate 50–80 bpm). Today's numbers may cover only part of the day: if steps are low, do not conclude anything; suggest how to use the rest of the day.
+    3. The headline must be specific and name the most notable item, not a generic title like "Daily health report". Tips must follow from the data and be doable right away, not generic advice like "keep a regular routine".
+    4. Friendly, concise, never preachy. No medical diagnosis. If something is clearly off (for example resting heart rate 5+ bpm above average, or under 6 hours of sleep), mention it gently and suggest keeping an eye on it.
+    5. Write in English only. Output one JSON object and nothing else:
+    {"headline": "a summary of at most 5 words", "summary": "2 to 3 sentences, at most 35 words in total", "tips": ["an action for today, at most 7 words; 1 to 3 tips"]}
+    """
+
+    static let systemZH = """
     你是用户的私人健康数据助手。根据用户 iPhone「健康」App 导出的当日数据和过去 7 天的平均值，用简体中文写一份当日小结。
     要求：
     1. 只依据给出的数据，缺失的指标不要猜测或编造；引用具体数字，并与 7 天平均对比。
@@ -47,11 +72,18 @@ enum Engine {
     {"headline": "一句话总结，不超过 14 个汉字", "summary": "2 到 3 句话，不超过 90 个汉字", "tips": ["今天可执行的建议，每条不超过 16 个汉字，1 到 3 条"]}
     """
 
-    static func prompt(_ day: DayRecord, _ avg: [String: Double], _ days: Int) -> String {
+    static func prompt(_ day: DayRecord, _ avg: [String: Double], _ days: Int, _ lang: String) -> String {
         func line(_ m: [String: Double]) -> String {
-            Metrics.defs.compactMap { d in m[d.key].map { "\(d.name) \(Metrics.format(d.key, $0)) \(d.unit)" } }.joined(separator: "；")
+            Metrics.defs.compactMap { d in m[d.key].map { "\(d.name(lang)) \(Metrics.format(d.key, $0)) \(d.unit(lang))" } }
+                .joined(separator: lang == "zh" ? "；" : "; ")
         }
-        var s = "日期：\(day.date)（现在是 \(Date().formatted(date: .omitted, time: .shortened))）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
+        let now = Date().formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: lang == "zh" ? "zh_CN" : "en_US")))
+        if lang != "zh" {
+            var s = "Date: \(day.date) (it is now \(now))\nParsed metrics: \(day.metrics.isEmpty ? "(none)" : line(day.metrics))\n"
+            s += avg.isEmpty ? "Previous 7-day average: no history yet\n" : "Previous 7-day average (\(days) days with data): \(line(avg))\n"
+            return s + "Raw export:\n\(day.raw)"
+        }
+        var s = "日期：\(day.date)（现在是 \(now)）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
         s += avg.isEmpty ? "过去 7 天平均：暂无历史数据\n" : "过去 7 天平均（共 \(days) 天有数据）：\(line(avg))\n"
         s += "原始导出内容：\n\(day.raw)"
         return s
@@ -66,19 +98,20 @@ enum Engine {
         let all = try persist ? History.upsert(day) : History.load().filter { $0.date != day.date } + [day]
         let avg = History.weekAverage(all, before: day.date)
         let days = all.filter { $0.date < day.date }.suffix(7).count
-        let reply = try await chat(cfg, prompt(day, avg, days))
+        let lang = cfg.language == "zh" ? "zh" : "en"
+        let reply = try await chat(cfg, lang == "zh" ? systemZH : systemEN, prompt(day, avg, days, lang))
         guard let obj = jsonObject(in: reply) else { throw EngineError.badReply(reply) }
         let s = Summary(
             date: day.date, generatedAt: Date(), model: cfg.model,
-            headline: (obj["headline"] as? String) ?? "今日小结",
+            headline: (obj["headline"] as? String) ?? (lang == "zh" ? "今日小结" : "Today"),
             summary: (obj["summary"] as? String) ?? reply,
             tips: (obj["tips"] as? [String]) ?? [],
-            metrics: day.metrics, weekAvg: avg, error: nil)
+            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang)
         if persist { try s.save() }
         return s
     }
 
-    static func chat(_ cfg: Config, _ user: String) async throws -> String {
+    static func chat(_ cfg: Config, _ system: String, _ user: String) async throws -> String {
         var req = URLRequest(url: URL(string: cfg.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/chat/completions")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 120

@@ -12,12 +12,14 @@ final class Model: ObservableObject {
     @Published var status = ""
     @Published var busy = false
     @Published var apiKey = Config.load().apiKey
+    @Published var lang = Config.load().language == "zh" ? "zh" : "en"
     @Published var panel = UserDefaults.standard.bool(forKey: "panel") { didSet { UserDefaults.standard.set(panel, forKey: "panel"); DesktopPanel.shared.show(panel, model: self) } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled
     private var lastAuto = Date.distantPast
     private var timer: Timer?
 
     init() {
+        L.lang = lang
         // iCloud delivers the iPhone's file some seconds to minutes after the shortcut runs; poll for it
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in Task { @MainActor in self.check() } }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
@@ -30,12 +32,12 @@ final class Model: ObservableObject {
         }
     }
 
-    /// Generate whenever the newest file's numbers differ from the summary's. The shortcut rewrites the file on every
-    /// app open, so automatic runs are spaced at least 30 min apart; a manual run does not count towards that.
+    /// Generate whenever the newest file's numbers (or the chosen language) differ from the summary's. The shortcut
+    /// rewrites the file on every app open, so automatic runs are spaced at least 30 min apart; a manual run does not count.
     func check() {
         Self.downloadPlaceholders()
         guard !busy, let f = HealthParser.latestFile(), let day = HealthParser.read(f) else { return }
-        if let s = summary, s.error == nil, s.date == day.date, s.metrics == day.metrics { return }
+        if let s = summary, s.error == nil, s.date == day.date, s.metrics == day.metrics, (s.lang ?? "zh") == lang { return }
         if Date().timeIntervalSince(lastAuto) < 30 * 60 { return }
         generate(auto: true)
     }
@@ -43,11 +45,11 @@ final class Model: ObservableObject {
     func generate(auto: Bool = false) {
         busy = true
         if auto { lastAuto = Date() }
-        status = "正在生成…"
+        status = L.t("Generating…", "正在生成…")
         Task { @MainActor in
             do {
                 summary = try await Engine.run()
-                status = "已更新 \(Date().formatted(date: .omitted, time: .shortened))"
+                status = L.t("Updated ", "已更新 ") + Date().formatted(date: .omitted, time: .shortened)
             } catch {
                 status = error.localizedDescription
             }
@@ -59,15 +61,26 @@ final class Model: ObservableObject {
     func saveKey() {
         var c = Config.load()
         c.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        do { try c.save(); status = "API Key 已保存" } catch { status = "保存失败：\(error.localizedDescription)"; return }
+        do { try c.save(); status = L.t("API key saved", "API Key 已保存") } catch { status = L.t("Could not save: ", "保存失败：") + error.localizedDescription; return }
         lastAuto = .distantPast
         check()
+    }
+
+    /// Switching language rewrites today's summary in that language.
+    func setLanguage(_ l: String) {
+        guard l != lang else { return }
+        lang = l
+        L.lang = l
+        var c = Config.load()
+        c.language = l
+        try? c.save()
+        if summary != nil, !busy { generate() }
     }
 
     func toggleLogin(_ on: Bool) {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-        } catch { status = "开机启动设置失败：\(error.localizedDescription)" }
+        } catch { status = L.t("Launch at login failed: ", "开机启动设置失败：") + error.localizedDescription }
         atLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -86,34 +99,53 @@ final class Model: ObservableObject {
 struct MainView: View {
     @ObservedObject var model: Model
 
+    func t(_ en: String, _ zh: String) -> String { model.lang == "zh" ? zh : en }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardView(summary: model.summary, size: .large)
-                .padding(14)
-                .frame(width: 330, height: 345)
-                .background(RoundedRectangle(cornerRadius: 18).fill(.background))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary))
-            HStack {
-                Button(model.busy ? "生成中…" : "立即生成") { model.generate() }.disabled(model.busy)
-                Button("数据文件夹") {
+        VStack(alignment: .leading, spacing: 14) {
+            WidgetFrame(size: .large) { CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+            HStack(spacing: 8) {
+                Button {
+                    model.generate()
+                } label: {
+                    Label(model.busy ? t("Generating…", "生成中…") : t("Generate Now", "立即生成"), systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.pink)
+                .disabled(model.busy)
+                Button {
                     let dir = FileManager.default.fileExists(atPath: Paths.inboxes[0].path) ? Paths.inboxes[0] : Paths.inboxes[1]
                     try? FileManager.default.createDirectory(at: Paths.inboxes[1], withIntermediateDirectories: true)
                     NSWorkspace.shared.open(dir)
+                } label: {
+                    Label(t("Data Folder", "数据文件夹"), systemImage: "folder")
                 }
                 Spacer()
-                Button("退出") { NSApp.terminate(nil) }
+                Button(t("Quit", "退出")) { NSApp.terminate(nil) }
             }
-            if !model.status.isEmpty { Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
-            Divider()
-            HStack {
-                SecureField("MiniMax API Key", text: $model.apiKey).textFieldStyle(.roundedBorder)
-                Button("保存") { model.saveKey() }
+            .controlSize(.regular)
+            if !model.status.isEmpty {
+                Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(3)
             }
-            Toggle("在桌面固定卡片", isOn: $model.panel)
-            Toggle("开机启动", isOn: Binding(get: { model.atLogin }, set: { model.toggleLogin($0) }))
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    SecureField("MiniMax API Key", text: $model.apiKey).textFieldStyle(.roundedBorder)
+                    Button(t("Save", "保存")) { model.saveKey() }
+                }
+                Picker(t("Language", "语言"), selection: Binding(get: { model.lang }, set: { model.setLanguage($0) })) {
+                    Text("English").tag("en")
+                    Text("中文").tag("zh")
+                }
+                .pickerStyle(.segmented)
+                Toggle(t("Pin card to desktop", "在桌面固定卡片"), isOn: $model.panel)
+                Toggle(t("Launch at login", "开机启动"), isOn: Binding(get: { model.atLogin }, set: { model.toggleLogin($0) }))
+            }
+            .padding(12)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .padding(16)
-        .frame(width: 362)
+        .frame(width: CardSize.large.frame.width + 32)
     }
 }
 
@@ -126,17 +158,18 @@ final class DesktopPanel {
     func show(_ on: Bool, model: Model) {
         guard on else { window?.orderOut(nil); return }
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 330, height: 345), styleMask: [.borderless], backing: .buffered, defer: false)
+            let size = CardSize.large.frame
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
             w.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
             w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
             w.isOpaque = false
             w.backgroundColor = .clear
-            w.hasShadow = true
+            w.hasShadow = true  // macOS traces the shadow from the card's rounded shape
             w.isMovableByWindowBackground = true
             w.contentView = NSHostingView(rootView: PanelView(model: model))
             w.setFrameAutosaveName("HealthWidgetPanel")
             if !w.setFrameUsingName("HealthWidgetPanel"), let screen = NSScreen.main {
-                w.setFrameTopLeftPoint(NSPoint(x: screen.visibleFrame.maxX - 350, y: screen.visibleFrame.maxY - 20))
+                w.setFrameTopLeftPoint(NSPoint(x: screen.visibleFrame.maxX - size.width - 20, y: screen.visibleFrame.maxY - 20))
             }
             window = w
         }
@@ -147,10 +180,7 @@ final class DesktopPanel {
 struct PanelView: View {
     @ObservedObject var model: Model
     var body: some View {
-        CardView(summary: model.summary, size: .large)
-            .padding(14)
-            .frame(width: 330, height: 345)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        WidgetFrame(size: .large) { CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) }
     }
 }
 
@@ -159,7 +189,7 @@ struct HealthWidgetApp: App {
     @StateObject private var model = Model()
 
     var body: some Scene {
-        MenuBarExtra("健康小结", systemImage: "heart.text.square") {
+        MenuBarExtra("HealthGlance", systemImage: "heart.text.square") {
             MainView(model: model)
         }
         .menuBarExtraStyle(.window)

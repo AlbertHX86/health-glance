@@ -4,12 +4,13 @@ import Foundation
 // with --generate also call MiniMax and print the summary; add --save to write summary.json / history.json as the app does.
 
 let args = Array(CommandLine.arguments.dropFirst())
+L.lang = Config.load().language
 let file = args.first { !$0.hasPrefix("--") }.map { URL(fileURLWithPath: $0) }
 guard let url = file ?? HealthParser.latestFile(), let day = HealthParser.read(url) else {
     print("没有找到健康数据文件"); exit(1)
 }
 print("文件：\(url.path)\n日期：\(day.date)")
-for d in Metrics.defs { if let v = day.metrics[d.key] { print("  \(d.name)：\(Metrics.format(d.key, v)) \(d.unit)") } }
+for d in Metrics.defs { if let v = day.metrics[d.key] { print("  \(d.name(L.lang)): \(Metrics.format(d.key, v)) \(d.unit(L.lang))") } }
 if args.contains("--generate") {
     let sem = DispatchSemaphore(value: 0)
     Task {
