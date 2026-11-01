@@ -27,6 +27,7 @@ final class Model: ObservableObject {
     @Published var gameMode = Config.load().gameMode
     @Published var folderLink = Config.load().inviteFolderLink
     @Published var shortcutLink = Config.load().inviteShortcutLink
+    @Published var myDevice = Config.load().myDevice
     @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL().path) ? Garden.pageURL() : nil
     private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
@@ -98,6 +99,23 @@ final class Model: ObservableObject {
         guard cfg.gardenHost else { return }
         Garden.update(cfg: cfg)
         gardenPage = FileManager.default.fileExists(atPath: Garden.pageURL(cfg).path) ? Garden.pageURL(cfg) : nil
+    }
+
+    /// Treat health-<device>.txt as your own file: its history joins yours in the game and its separate summary goes.
+    func setMyDevice(_ d: String) {
+        var c = Config.loadFile()
+        c.myDevice = d
+        try? c.save()
+        _ = Config.loadFile()
+        myDevice = d
+        if !d.isEmpty {
+            Garden.rename(from: d, to: c.gardenName)
+            try? FileManager.default.removeItem(at: Paths.dir(d))
+            summaries[d] = nil
+            if selected == d { selected = "" }
+        }
+        people = HealthParser.people()
+        check()
     }
 
     /// Confirm, then start the game over for everyone.
@@ -293,6 +311,15 @@ struct MainView: View {
                     Text("中文").tag("zh")
                 }
                 .pickerStyle(.segmented)
+                let phones = Array(Set(model.people + [model.myDevice].filter { !$0.isEmpty })).sorted()
+                if !phones.isEmpty {
+                    Picker(t("My iPhone", "我的 iPhone"), selection: Binding(get: { model.myDevice }, set: { model.setMyDevice($0) })) {
+                        Text("health.txt").tag("")
+                        ForEach(phones, id: \.self) { Text($0).tag($0) }
+                    }
+                    Text(t("Using the players' shortcut yourself? Pick your phone so its file counts as you.", "你自己也用玩家的快捷指令？选上你的手机，它的文件就算作你的数据。"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle(t("Pin card to desktop", "在桌面固定卡片"), isOn: $model.panel)
                 Toggle(t("Launch at login", "开机启动"), isOn: Binding(get: { model.atLogin }, set: { model.toggleLogin($0) }))
             }

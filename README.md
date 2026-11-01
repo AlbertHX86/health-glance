@@ -169,6 +169,8 @@ The invite is the iCloud share link of a folder named `HealthGlance`. Players jo
 
 iOS does not let anyone share automations, so step 4 is the only one each player does by hand. After that, uploading is automatic.
 
+The host can use this one shortcut too: in the menu, pick your phone under **Settings › My iPhone**, and its `health-<phone name>.txt` counts as your own data, so you can delete **Health Export**.
+
 The shortcut is the same for everyone. It names the file after the phone (Settings › General › About › Name), so "Lin's iPhone" joins the game as "Lin". If two players' phones are both just called "iPhone", one of them should rename theirs.
 
 The players' shortcut description, also included in the invite:

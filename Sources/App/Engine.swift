@@ -17,6 +17,7 @@ struct Config: Codable {
     var gameID = 0  // raised by New game, so the eggs roll again
     var inviteFolderLink = ""  // iCloud share link of the HealthGlance folder
     var inviteShortcutLink = ""  // iCloud link of the players' shortcut
+    var myDevice = ""  // your phone's name, when you use the players' shortcut too: health-<it>.txt is then you
 
     init() {}
 
@@ -38,6 +39,7 @@ struct Config: Codable {
         gameID = try c.decodeIfPresent(Int.self, forKey: .gameID) ?? d.gameID
         inviteFolderLink = try c.decodeIfPresent(String.self, forKey: .inviteFolderLink) ?? d.inviteFolderLink
         inviteShortcutLink = try c.decodeIfPresent(String.self, forKey: .inviteShortcutLink) ?? d.inviteShortcutLink
+        myDevice = try c.decodeIfPresent(String.self, forKey: .myDevice) ?? d.myDevice
     }
 
     static func load() -> Config {
@@ -48,7 +50,9 @@ struct Config: Codable {
 
     /// The file alone, without the environment override; start from this when changing and saving settings.
     static func loadFile() -> Config {
-        (try? Data(contentsOf: Paths.config)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) } ?? Config()
+        let c = (try? Data(contentsOf: Paths.config)).flatMap { try? JSONDecoder().decode(Config.self, from: $0) } ?? Config()
+        HealthParser.me = [c.myDevice, c.gardenName].filter { !$0.isEmpty }  // so every reader agrees on which file is you
+        return c
     }
 
     func save() throws {

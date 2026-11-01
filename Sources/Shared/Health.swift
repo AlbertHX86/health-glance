@@ -118,7 +118,15 @@ enum HealthParser {
 
     /// health-妈妈.txt → "妈妈"; health.txt or a dated file → nil (you). The invite shortcut names files after the
     /// phone, so "health-小林的iPhone.txt" → "小林" and "health-Lin’s iPhone.txt" → "Lin".
+    /// Names whose health-<name>.txt is your own file (your phone's name, your game name); set when the config loads.
+    static var me: [String] = []
+
     static func person(of url: URL) -> String? {
+        guard let p = rawPerson(of: url) else { return nil }
+        return me.contains { $0.caseInsensitiveCompare(p) == .orderedSame } ? nil : p
+    }
+
+    private static func rawPerson(of url: URL) -> String? {
         let name = url.deletingPathExtension().lastPathComponent
         guard let m = name.firstMatch(#"(?i)^health[-_ ](.+)$"#) else { return nil }
         let p = m[1].replacingOccurrences(of: "/", with: "_").trimmingCharacters(in: .whitespaces)
