@@ -20,7 +20,10 @@ final class Model: ObservableObject {
     @Published var busy = false
     @Published var apiKey = Config.load().apiKey
     @Published var lang = Config.load().language == "zh" ? "zh" : "en"
-    @Published var panel = UserDefaults.standard.bool(forKey: "panel") { didSet { UserDefaults.standard.set(panel, forKey: "panel"); DesktopPanel.shared.show(panel, model: self) } }
+    /// What sits on the desktop besides the system widget: "card" (the pinned card), "island" (Dynamic Island) or "off".
+    @Published var display = UserDefaults.standard.string(forKey: "display") ?? (UserDefaults.standard.bool(forKey: "panel") ? "card" : "off") {
+        didSet { UserDefaults.standard.set(display, forKey: "display"); showDisplay() }
+    }
     @Published var atLogin = SMAppService.mainApp.status == .enabled
     @Published var gardenHost = Config.load().gardenHost
     @Published var gardenName = Config.load().gardenName
@@ -58,7 +61,7 @@ final class Model: ObservableObject {
             Task { @MainActor in self.check() }
         }
         Task { @MainActor in
-            DesktopPanel.shared.show(self.panel, model: self)
+            self.showDisplay()
             self.publishDisplay()  // also reloads the widget; summary.json may have been written by healthwidget-cli
             self.check()
         }
@@ -161,7 +164,12 @@ final class Model: ObservableObject {
     func publishDisplay() {
         if let s = summaries[selected] ?? summaries[""] { try? s.save(to: Paths.display) }
         WidgetCenter.shared.reloadAllTimelines()
-        DispatchQueue.main.async { DesktopPanel.shared.fit() }
+        DispatchQueue.main.async { DesktopPanel.shared.fit(); Island.shared.place() }
+    }
+
+    func showDisplay() {
+        DesktopPanel.shared.show(display == "card", model: self)
+        Island.shared.show(display == "island", model: self)
     }
 
     /// Tick a tip of the summary shown, or untick it.
@@ -363,7 +371,12 @@ struct MainView: View {
                     Text(t("Using the players' shortcut yourself? Pick your phone so its file counts as you.", "你自己也用玩家的快捷指令？选上你的手机，它的文件就算作你的数据。"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Toggle(t("Pin card to desktop", "在桌面固定卡片"), isOn: $model.panel)
+                Picker(t("On the desktop", "桌面显示"), selection: $model.display) {
+                    Text(t("Card", "卡片")).tag("card")
+                    Text(t("Dynamic Island", "灵动岛")).tag("island")
+                    Text(t("Off", "不显示")).tag("off")
+                }
+                .pickerStyle(.segmented)
                 Toggle(t("Launch at login", "开机启动"), isOn: Binding(get: { model.atLogin }, set: { model.toggleLogin($0) }))
             }
             .padding(12)
