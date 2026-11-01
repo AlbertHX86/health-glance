@@ -185,11 +185,11 @@ steps: the result of step 1
 sleep: the result of step 2
 resting heart rate: the result of step 3
 active energy: the result of step 4
-7. Save File: save the text into the "HealthGlance" folder in iCloud Drive, named "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
+7. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
 Do not use "in the last 1 day" for any date filter.
 ```
 
-If the generated **Save File** does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. `./build/healthwidget-cli --invite` prints the invite message.
+**Save File** saves into the Shortcuts folder by default, so a generated shortcut often writes `Shortcuts/HealthGlance/health-….txt`, which is not shared and never reaches the host. After the first run, check in the Files app where the file landed. If it is wrong, tap the blue **Shortcuts** folder in **Save File**, choose `HealthGlance` at the top level of iCloud Drive, and keep only `health-`device name`.txt` as the subpath. `./build/healthwidget-cli --invite` prints the invite message.
 
 ### Notes
 

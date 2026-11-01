@@ -21,7 +21,7 @@ enum Invite {
         睡眠: 第 2 步的结果
         静息心率: 第 3 步的结果
         活动能量: 第 4 步的结果
-        7. 存储文件：把这段文本存到 iCloud 云盘里的「HealthGlance」文件夹，文件名为「health-」加上第 5 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
+        7. 存储文件：存储位置选 iCloud 云盘最外层的「HealthGlance」文件夹（不是「快捷指令」文件夹里面），子路径只填文件名：「health-」加上第 5 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
         所有日期条件都不要用「在最近 1 天」。
         """ : """
         Create a shortcut named "HealthGlance Upload" that does these steps in order:
@@ -35,7 +35,7 @@ enum Invite {
         sleep: the result of step 2
         resting heart rate: the result of step 3
         active energy: the result of step 4
-        7. Save File: save the text into the "HealthGlance" folder in iCloud Drive, named "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
+        7. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
         Do not use "in the last 1 day" for any date filter.
         """
     }
@@ -55,7 +55,7 @@ enum Invite {
 
             1. 打开这个链接，加入共享文件夹：\(folder)
             2. \(shortcut)
-            3. 手动运行一次这个快捷指令，允许它读取健康数据。
+            3. 手动运行一次这个快捷指令，允许它读取健康数据。然后打开「文件」App › iCloud 云盘 › HealthGlance，确认里面出现了 health-你的手机名.txt。如果它跑到了「快捷指令」文件夹里，就在「存储文件」里点蓝色的「快捷指令」，改选最外层的 HealthGlance。
             4. 打开「快捷指令」App 的「自动化」，点「+」，选「App」，选一个你每天都会打开的 App（比如微信），选「已打开」和「立即运行」，再选这个快捷指令。之后每天打开那个 App 时，数据就会自动上传。
 
             你的名字取自手机名称（设置 › 通用 › 关于本机 › 名称），例如「小林的iPhone」会显示为「小林」。
@@ -68,7 +68,7 @@ enum Invite {
 
         1. Open this link to join the shared folder: \(folder)
         2. \(shortcut)
-        3. Run the shortcut once by hand and allow it to read your Health data.
+        3. Run the shortcut once by hand and allow it to read your Health data. Then check in the Files app that iCloud Drive › HealthGlance has health-<your phone name>.txt. If it went into the Shortcuts folder instead, tap the blue Shortcuts folder in Save File and choose the top-level HealthGlance.
         4. In the Shortcuts app, open Automation, tap +, choose App, pick an app you open every day, choose Is Opened and Run Immediately, then select the shortcut. From then on, your numbers upload whenever you open that app.
 
         Your name comes from your phone's name (Settings › General › About › Name): "Lin's iPhone" shows as "Lin".
