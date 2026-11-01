@@ -8,18 +8,32 @@ import WidgetKit
 
 @MainActor
 final class Model: ObservableObject {
-    @Published var summary = Summary.load()
+    /// Summaries by person; "" is you.
+    @Published var summaries: [String: Summary] = [:]
+    @Published var people: [String] = []
+    @Published var selected = UserDefaults.standard.string(forKey: "person") ?? "" {
+        didSet { UserDefaults.standard.set(selected, forKey: "person"); publishDisplay() }
+    }
+    @Published var sources = Sources.latest()
     @Published var status = ""
     @Published var busy = false
     @Published var apiKey = Config.load().apiKey
     @Published var lang = Config.load().language == "zh" ? "zh" : "en"
     @Published var panel = UserDefaults.standard.bool(forKey: "panel") { didSet { UserDefaults.standard.set(panel, forKey: "panel"); DesktopPanel.shared.show(panel, model: self) } }
     @Published var atLogin = SMAppService.mainApp.status == .enabled
-    private var lastAuto = Date.distantPast
+    private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
+
+    var summary: Summary? { summaries[selected] }
+
+    static func person(_ key: String) -> String? { key.isEmpty ? nil : key }
 
     init() {
         L.lang = lang
+        people = HealthParser.people()
+        summaries[""] = Summary.load()
+        for p in people { summaries[p] = Summary.load(p) }
+        if !selected.isEmpty && !people.contains(selected) { selected = "" }
         // iCloud delivers the iPhone's file some seconds to minutes after the shortcut runs; poll for it
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in Task { @MainActor in self.check() } }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
@@ -27,46 +41,65 @@ final class Model: ObservableObject {
         }
         Task { @MainActor in
             DesktopPanel.shared.show(self.panel, model: self)
-            WidgetCenter.shared.reloadAllTimelines()  // summary.json may have been written by healthwidget-cli
+            self.publishDisplay()  // also reloads the widget; summary.json may have been written by healthwidget-cli
             self.check()
         }
     }
 
-    /// Generate whenever the newest file's numbers (or the chosen language) differ from the summary's. The shortcut
-    /// rewrites the file on every app open, so automatic runs are spaced at least 30 min apart; a manual run does not count.
+    /// For you and each person with a file, generate when the newest numbers (or the chosen language) differ from the
+    /// summary's. The shortcut rewrites the file on every app open, so automatic runs per person are at least 30 min
+    /// apart; a manual run does not count. One generation at a time: each one ends by checking again.
     func check() {
         Self.downloadPlaceholders()
-        guard !busy, let f = HealthParser.latestFile(), let day = HealthParser.read(f) else { return }
-        if let s = summary, s.error == nil, s.date == day.date, s.metrics == day.metrics, (s.lang ?? "zh") == lang { return }
-        if Date().timeIntervalSince(lastAuto) < 30 * 60 { return }
-        generate(auto: true)
+        people = HealthParser.people()
+        sources = Sources.latest()
+        guard !busy else { return }
+        for key in [""] + people {
+            let p = Self.person(key)
+            guard let f = HealthParser.latestFile(person: p), let day = HealthParser.read(f) else { continue }
+            if let s = summaries[key] ?? Summary.load(p), s.error == nil, s.date == day.date, s.metrics == day.metrics, (s.lang ?? "zh") == lang {
+                summaries[key] = s
+                continue
+            }
+            if Date().timeIntervalSince(lastAuto[key] ?? .distantPast) < 30 * 60 { continue }
+            generate(key, auto: true)
+            return
+        }
     }
 
-    func generate(auto: Bool = false) {
+    func generate(_ key: String? = nil, auto: Bool = false) {
+        let key = key ?? selected
         busy = true
-        if auto { lastAuto = Date() }
-        status = L.t("Generating…", "正在生成…")
+        if auto { lastAuto[key] = Date() }
+        status = L.t("Generating…", "正在生成…") + (key.isEmpty ? "" : " (\(key))")
         Task { @MainActor in
             do {
-                summary = try await Engine.run()
+                summaries[key] = try await Engine.run(person: Self.person(key))
                 status = L.t("Updated ", "已更新 ") + Date().formatted(date: .omitted, time: .shortened)
             } catch {
                 status = error.localizedDescription
             }
             busy = false
-            WidgetCenter.shared.reloadAllTimelines()
+            publishDisplay()
+            check()
         }
+    }
+
+    /// Copy the chosen person's summary to display.json, which the widget reads.
+    func publishDisplay() {
+        if let s = summaries[selected] ?? summaries[""] { try? s.save(to: Paths.display) }
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func saveKey() {
         var c = Config.load()
         c.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         do { try c.save(); status = L.t("API key saved", "API Key 已保存") } catch { status = L.t("Could not save: ", "保存失败：") + error.localizedDescription; return }
-        lastAuto = .distantPast
+        lastAuto = [:]
         check()
     }
 
-    /// Switching language rewrites today's summary in that language.
+    /// Switching language rewrites the summaries in that language (the one shown first).
     func setLanguage(_ l: String) {
         guard l != lang else { return }
         lang = l
@@ -74,6 +107,7 @@ final class Model: ObservableObject {
         var c = Config.load()
         c.language = l
         try? c.save()
+        lastAuto = [:]
         if summary != nil, !busy { generate() }
     }
 
@@ -115,8 +149,8 @@ struct MainView: View {
                 .tint(.pink)
                 .disabled(model.busy)
                 Button {
-                    let dir = FileManager.default.fileExists(atPath: Paths.inboxes[0].path) ? Paths.inboxes[0] : Paths.inboxes[1]
-                    try? FileManager.default.createDirectory(at: Paths.inboxes[1], withIntermediateDirectories: true)
+                    let dir = FileManager.default.fileExists(atPath: Paths.inboxes[0].path) ? Paths.inboxes[0] : Paths.localInbox
+                    try? FileManager.default.createDirectory(at: Paths.localInbox, withIntermediateDirectories: true)
                     NSWorkspace.shared.open(dir)
                 } label: {
                     Label(t("Data Folder", "数据文件夹"), systemImage: "folder")
@@ -127,6 +161,27 @@ struct MainView: View {
             .controlSize(.regular)
             if !model.status.isEmpty {
                 Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+            }
+            if !model.people.isEmpty {
+                Picker(t("Showing", "显示"), selection: $model.selected) {
+                    Text(t("Me", "我")).tag("")
+                    ForEach(model.people, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+            if let src = model.sources {
+                DisclosureGroup(t("Source test", "来源测试") + " · " + src.modified.formatted(date: .abbreviated, time: .shortened)) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(src.counts.prefix(10).enumerated()), id: \.offset) { _, c in
+                            HStack { Text(c.name).lineLimit(1); Spacer(); Text("\(c.n)").monospacedDigit().foregroundStyle(.secondary) }
+                        }
+                        Text(t("If someone else's device is listed, your iPhone can read their shared data.",
+                               "列表里出现别人的设备，就说明 iPhone 能读到对方共享的数据。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .font(.callout)
+                    .padding(.top, 4)
+                }
             }
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {

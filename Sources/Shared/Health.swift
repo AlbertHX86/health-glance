@@ -14,11 +14,23 @@ enum Paths {
     static let summary = base.appendingPathComponent("summary.json")
     static let history = base.appendingPathComponent("history.json")
     static let config = base.appendingPathComponent("config.json")
-    /// iCloud Drive › 快捷指令 › HealthWidget (written by the iPhone shortcut), then a local folder for manual drops.
+    /// The summary the widget shows: a copy of the person chosen in the menu.
+    static let display = base.appendingPathComponent("display.json")
+    /// iCloud Drive › 快捷指令 › HealthWidget (written by your iPhone shortcut); iCloud Drive › HealthGlance (a folder
+    /// you share with someone, so their shortcut can drop files in); a local folder for manual drops.
     static let inboxes = [
         home.appendingPathComponent("Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/HealthWidget", isDirectory: true),
+        home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/HealthGlance", isDirectory: true),
         base.appendingPathComponent("inbox", isDirectory: true),
     ]
+    static let localInbox = inboxes[2]
+
+    /// Your own data stays at the top level; each other person gets people/<name>/.
+    static func dir(_ person: String?) -> URL {
+        person.map { base.appendingPathComponent("people/\($0)", isDirectory: true) } ?? base
+    }
+    static func summary(_ person: String?) -> URL { dir(person).appendingPathComponent("summary.json") }
+    static func history(_ person: String?) -> URL { dir(person).appendingPathComponent("history.json") }
 }
 
 struct MetricDef {
@@ -79,6 +91,7 @@ struct DayRecord: Codable {
     var metrics: [String: Double]
     var raw: String
     var file: String
+    var person: String? = nil  // nil = you; from the file name health-<name>.txt
 }
 
 enum HealthParser {
@@ -89,18 +102,35 @@ enum HealthParser {
         return f
     }()
 
-    /// Newest data file across the inboxes (.txt / .json / .md, named by date or not).
-    static func latestFile() -> URL? {
+    /// Every data file in the inboxes with its modification date (.txt / .json / .md; sources.txt is the test file).
+    static func files() -> [(url: URL, modified: Date)] {
         let fm = FileManager.default
-        var files: [(URL, Date)] = []
+        var out: [(URL, Date)] = []
         for dir in Paths.inboxes {
             guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
-            for u in items where ["txt", "json", "md"].contains(u.pathExtension.lowercased()) {
-                let d = (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                files.append((u, d))
+            for u in items where ["txt", "json", "md"].contains(u.pathExtension.lowercased()) && u.lastPathComponent.lowercased() != Sources.file {
+                out.append((u, (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
             }
         }
-        return files.max { $0.1 < $1.1 }?.0
+        return out
+    }
+
+    /// health-妈妈.txt → "妈妈"; health.txt or a dated file → nil (you).
+    static func person(of url: URL) -> String? {
+        let name = url.deletingPathExtension().lastPathComponent
+        guard let m = name.firstMatch(#"(?i)^health[-_ ](.+)$"#) else { return nil }
+        let p = m[1].replacingOccurrences(of: "/", with: "_").trimmingCharacters(in: .whitespaces)
+        return p.isEmpty ? nil : p
+    }
+
+    /// Newest data file of one person (nil = you).
+    static func latestFile(person: String? = nil) -> URL? {
+        files().filter { self.person(of: $0.url) == person }.max { $0.modified < $1.modified }?.url
+    }
+
+    /// Other people who have a data file, sorted by name.
+    static func people() -> [String] {
+        Array(Set(files().compactMap { person(of: $0.url) })).sorted()
     }
 
     static func read(_ url: URL) -> DayRecord? {
@@ -122,7 +152,7 @@ enum HealthParser {
             guard let def = Metrics.match(key), metrics[def.key] == nil, let x = value(def.key, v) else { continue }
             metrics[def.key] = x
         }
-        return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent)
+        return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent, person: person(of: url))
     }
 
     static func fileDate(_ url: URL) -> String? { firstDate(url.lastPathComponent) }
@@ -194,20 +224,27 @@ struct Summary: Codable {
     var weekAvg: [String: Double]
     var error: String?
     var lang: String?  // language the text was written in; nil = before languages existed (Chinese)
+    var person: String? = nil  // nil = you
 
-    static func load() -> Summary? {
-        guard let d = try? Data(contentsOf: Paths.summary) else { return nil }
+    static func load(_ person: String? = nil) -> Summary? { read(Paths.summary(person)) }
+
+    /// What the widget shows (the person chosen in the menu), falling back to your own summary.
+    static func loadDisplay() -> Summary? { read(Paths.display) ?? load() }
+
+    static func read(_ url: URL) -> Summary? {
+        guard let d = try? Data(contentsOf: url) else { return nil }
         let dec = JSONDecoder()
         dec.dateDecodingStrategy = .iso8601
         return try? dec.decode(Summary.self, from: d)
     }
 
-    func save() throws {
-        try FileManager.default.createDirectory(at: Paths.base, withIntermediateDirectories: true)
+    func save(to url: URL? = nil) throws {
+        let url = url ?? Paths.summary(person)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(self).write(to: Paths.summary, options: .atomic)
+        try enc.encode(self).write(to: url, options: .atomic)
     }
 
     /// Made-up numbers for the widget gallery preview and the README screenshots.
@@ -227,20 +264,20 @@ struct Summary: Codable {
 
 /// Past days, one record per date, newest last; kept to 30 days.
 enum History {
-    static func load() -> [DayRecord] {
-        guard let d = try? Data(contentsOf: Paths.history) else { return [] }
+    static func load(_ person: String? = nil) -> [DayRecord] {
+        guard let d = try? Data(contentsOf: Paths.history(person)) else { return [] }
         return (try? JSONDecoder().decode([DayRecord].self, from: d)) ?? []
     }
 
     static func upsert(_ r: DayRecord) throws -> [DayRecord] {
-        var all = load().filter { $0.date != r.date }
+        var all = load(r.person).filter { $0.date != r.date }
         all.append(r)
         all.sort { $0.date < $1.date }
         all = Array(all.suffix(30))
-        try FileManager.default.createDirectory(at: Paths.base, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: Paths.dir(r.person), withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(all).write(to: Paths.history, options: .atomic)
+        try enc.encode(all).write(to: Paths.history(r.person), options: .atomic)
         return all
     }
 
@@ -253,5 +290,25 @@ enum History {
             if !xs.isEmpty { out[def.key] = xs.reduce(0, +) / Double(xs.count) }
         }
         return out
+    }
+}
+
+/// The source test: a shortcut writes the source (device or app) of every recent Health sample to sources.txt,
+/// one per line. Seeing another person's device here would mean the iPhone can read their shared data.
+enum Sources {
+    static let file = "sources.txt"
+
+    static func latest() -> (modified: Date, counts: [(name: String, n: Int)])? {
+        let found = Paths.inboxes.map { $0.appendingPathComponent(file) }.compactMap { u -> (URL, Date)? in
+            guard let d = (try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate else { return nil }
+            return (u, d)
+        }
+        guard let (url, modified) = found.max(by: { $0.1 < $1.1 }), let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        var n: [String: Int] = [:]
+        for line in text.components(separatedBy: .newlines) {
+            let name = line.trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty { n[name, default: 0] += 1 }
+        }
+        return (modified, n.map { ($0.key, $0.value) }.sorted { $0.n > $1.n })
     }
 }

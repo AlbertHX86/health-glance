@@ -12,12 +12,12 @@ struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> Entry { Entry(date: Date(), summary: .placeholder("en")) }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
-        completion(Entry(date: Date(), summary: Summary.load() ?? .placeholder("en")))
+        completion(Entry(date: Date(), summary: Summary.loadDisplay() ?? .placeholder("en")))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        completion(Timeline(entries: [Entry(date: Date(), summary: Summary.load())], policy: .after(next)))
+        completion(Timeline(entries: [Entry(date: Date(), summary: Summary.loadDisplay())], policy: .after(next)))
     }
 }
 

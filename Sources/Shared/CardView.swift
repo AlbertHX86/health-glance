@@ -135,7 +135,7 @@ struct CardView: View {
     func header(_ s: Summary?) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "heart.fill")
-            Text(s.map { dayLabel($0.date) } ?? "HealthGlance")
+            Text(s.map { s in (s.person.map { "\($0) · " } ?? "") + dayLabel(s.date) } ?? "HealthGlance").lineLimit(1)
             Spacer(minLength: 0)
         }
         .font(.system(size: 12, weight: .semibold))

@@ -108,6 +108,35 @@ An app trigger is used instead of a time of day because a locked iPhone cannot r
 
 Action names can differ slightly between iOS versions. If a filter is missing, skip it.
 
+## Someone else's data
+
+The Mac app can show more than one person. Each person has their own file, `health-<name>.txt`, for example `health-Mom.txt`, and gets a separate summary with a separate 7-day history. Choose whose card is shown with **Showing** in the menu; the widget and the pinned card follow that choice.
+
+Their numbers are sent to MiniMax too, so ask them before you set this up.
+
+**Step 1: Test whether your iPhone can read their shared data.** Data that someone shares with you in the Health app's **Sharing** tab may not be readable by shortcuts. To find out, create this test shortcut by pasting the description below into the Shortcuts app (iOS 27), then run it once:
+
+```text
+Create a shortcut named "Health Sources Test" that does these steps in order:
+1. Find Health Samples where Type is Steps and Start Date is in the last 7 days, sorted by Start Date with the latest first, limited to 500 samples.
+2. Get Details of Health Sample: Source, for the samples from step 1.
+3. Find Health Samples where Type is Heart Rate and Start Date is in the last 7 days, sorted by Start Date with the latest first, limited to 500 samples.
+4. Get Details of Health Sample: Source, for the samples from step 3.
+5. Make a Text containing the result of step 2, a new line, then the result of step 4, with one source per line.
+6. Save File: save the text to iCloud Drive in the Shortcuts folder, subpath HealthWidget/sources.txt. Do not ask where to save. Overwrite the file if it exists.
+```
+
+Within a minute, **Source test** appears in the Mac menu. It lists every device and app that wrote those samples, with the number of samples from each.
+
+**Step 2: Set up their file.** What to do depends on the test result:
+
+- **Their device is in the list:** your iPhone can read their data. Duplicate `Health Export`. In each **Find Health Samples**, add the filter **Source is (their device)**. Change the file name in **Save File** to `HealthWidget/health-<name>.txt`.
+- **Only your own devices are listed:** their shared data cannot be read, so they need to export it from their own iPhone.
+  1. On your iPhone or Mac, create a folder named `HealthGlance` in iCloud Drive and share it with them, giving them permission to make changes.
+  2. They set up `Health Export` on their iPhone, as described above.
+  3. In their **Save File**, they choose the shared `HealthGlance` folder and the file name `health-<name>.txt`.
+  4. The Mac app reads that folder too.
+
 ## When summaries are made
 
 The Mac checks iCloud once a minute and writes a new summary when the numbers change. Automatic summaries are made at most once every 30 minutes. Each time the shortcut runs, the file is updated, so the summary follows your day. iCloud usually takes from a few seconds to a few minutes to bring a new file from the iPhone to the Mac.
@@ -133,6 +162,7 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ## Privacy
 
 - To make the summary, the day's health numbers are sent to the MiniMax API. Do not use the app if you do not want that.
+- The same goes for anyone else whose file you add (see [Someone else's data](#someone-elses-data)), so ask them first.
 - Nothing else leaves the Mac. The last 30 days of numbers are stored in `history.json` next to the config file, and are used for the 7-day comparison.
 - The widget runs in a sandbox. It can read only `summary.json`: it cannot read the config file with your key, and it has no network access.
 
@@ -142,6 +172,7 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli sample/2026-10-31.txt               # parse only
 ./build/healthwidget-cli sample/2026-10-31.txt --generate    # also call MiniMax; prints, writes nothing
 ./build/healthwidget-cli --generate --save                   # newest data → summary.json, as the app does
+./build/healthwidget-cli --sources                           # what the source test found
 ```
 
 Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read as well.

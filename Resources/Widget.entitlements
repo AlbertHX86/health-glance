@@ -3,8 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key><true/>
-	<!-- the widget may read only summary.json written by the app: no network, no access to config.json (the key) -->
+	<!-- the widget may read only the summaries written by the app: no network, no access to config.json (the key) -->
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
-	<array><string>/Library/Application Support/HealthWidget/summary.json</string></array>
+	<array>
+		<string>/Library/Application Support/HealthWidget/summary.json</string>
+		<string>/Library/Application Support/HealthWidget/display.json</string>
+	</array>
 </dict>
 </plist>

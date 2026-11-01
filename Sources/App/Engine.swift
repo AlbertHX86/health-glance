@@ -79,11 +79,13 @@ enum Engine {
         }
         let now = Date().formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: lang == "zh" ? "zh_CN" : "en_US")))
         if lang != "zh" {
-            var s = "Date: \(day.date) (it is now \(now))\nParsed metrics: \(day.metrics.isEmpty ? "(none)" : line(day.metrics))\n"
+            var s = day.person.map { "This data belongs to \($0), who shares their Health data with the user. Write about \($0) in the third person.\n" } ?? ""
+            s += "Date: \(day.date) (it is now \(now))\nParsed metrics: \(day.metrics.isEmpty ? "(none)" : line(day.metrics))\n"
             s += avg.isEmpty ? "Previous 7-day average: no history yet\n" : "Previous 7-day average (\(days) days with data): \(line(avg))\n"
             return s + "Raw export:\n\(day.raw)"
         }
-        var s = "日期：\(day.date)（现在是 \(now)）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
+        var s = day.person.map { "这些数据属于「\($0)」，是对方共享给用户的。请用第三人称写「\($0)」。\n" } ?? ""
+        s += "日期：\(day.date)（现在是 \(now)）\n解析出的指标：\(day.metrics.isEmpty ? "（无）" : line(day.metrics))\n"
         s += avg.isEmpty ? "过去 7 天平均：暂无历史数据\n" : "过去 7 天平均（共 \(days) 天有数据）：\(line(avg))\n"
         s += "原始导出内容：\n\(day.raw)"
         return s
@@ -91,11 +93,11 @@ enum Engine {
 
     /// Reads the newest health file, asks MiniMax for a summary and writes summary.json for the widget
     /// (persist: false leaves history.json and summary.json untouched, for tests).
-    static func run(file: URL? = nil, persist: Bool = true) async throws -> Summary {
+    static func run(file: URL? = nil, person: String? = nil, persist: Bool = true) async throws -> Summary {
         let cfg = Config.load()
         guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
-        guard let url = file ?? HealthParser.latestFile(), let day = HealthParser.read(url) else { throw EngineError.noData }
-        let all = try persist ? History.upsert(day) : History.load().filter { $0.date != day.date } + [day]
+        guard let url = file ?? HealthParser.latestFile(person: person), let day = HealthParser.read(url) else { throw EngineError.noData }
+        let all = try persist ? History.upsert(day) : History.load(day.person).filter { $0.date != day.date } + [day]
         let avg = History.weekAverage(all, before: day.date)
         let days = all.filter { $0.date < day.date }.suffix(7).count
         let lang = cfg.language == "zh" ? "zh" : "en"
@@ -106,7 +108,7 @@ enum Engine {
             headline: (obj["headline"] as? String) ?? (lang == "zh" ? "今日小结" : "Today"),
             summary: (obj["summary"] as? String) ?? reply,
             tips: (obj["tips"] as? [String]) ?? [],
-            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang)
+            metrics: day.metrics, weekAvg: avg, error: nil, lang: lang, person: day.person)
         if persist { try s.save() }
         return s
     }
