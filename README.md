@@ -137,20 +137,119 @@ Within a minute, **Source test** appears in the Mac menu. It lists every device 
   3. In their **Save File**, they choose the shared `HealthGlance` folder and the file name `health-<name>.txt`.
   4. The Mac app reads that folder too.
 
-## Garden PK
+## Games with friends
 
-Everyone who shares the `HealthGlance` folder grows a plant, and each day their Health numbers make it grow. One Mac writes a garden page into the shared folder. Anyone can open it in Finder, or in the Files app on an iPhone.
+Everyone who shares the `HealthGlance` folder can play. Each day, their Health numbers count in the game. One Mac, the host, writes the game page into the shared folder. Anyone can open it in Finder, or in the Files app on an iPhone. The page is plain HTML and CSS with no JavaScript, so it also opens in the iPhone's file preview.
+
+There are two games. Choose one in the menu under **Game**:
+
+- **Puff Battles**, the default: each player hatches a random pet, and the pets battle each other every day.
+- **Garden**: each player grows a plant.
+
+Neither game uses AI, so no player's numbers are sent to MiniMax for it.
+
+### Set up for each player
+
+1. The host creates a folder named `HealthGlance` in iCloud Drive and shares it with each player, giving them permission to make changes.
+2. Each player builds this shortcut on their own iPhone. They paste the description into the Shortcuts app (iOS 27), replacing `<name>` and the plant with their own:
+
+```text
+Create a shortcut named "HealthGlance Export" that does these steps in order:
+1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
+2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
+3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
+4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
+5. Make a Text with exactly these five lines, putting each result after its colon:
+plant: tomato
+steps: the result of step 1
+sleep: the result of step 2
+resting heart rate: the result of step 3
+active energy: the result of step 4
+6. Save File: save the text into the shared folder "HealthGlance" in iCloud Drive, as health-<name>.txt. Do not ask where to save. Overwrite the file if it exists.
+Do not use "in the last 1 day" for any date filter.
+```
+
+If the generated **Save File** action does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. Each player then runs the shortcut once by hand and adds an automation that runs it when they open an app every day, as in Step 5 above.
+
+In Puff Battles the `plant:` line does nothing and can be left out.
+
+### Notes
+
+- **One host only.** Only one Mac should make the page (**Game › Make the game page on this Mac**). If two Macs rewrite the same file in a shared folder, iCloud keeps conflicting copies.
+- **Language:** the page uses the host's language setting.
+- **Dates:** each day follows the host's time zone.
+- **Privacy:** everyone in the folder can see everyone's daily numbers.
+
+### Puff Battles
+
+<img src="docs/pets.png" width="640" alt="Puff Battles page with three players">
+
+*Made-up players.* The pets are original designs drawn by the app.
+
+**Hatching.** At the start of each season, every player gets an egg. The egg hatches at 15 EXP, which takes about two good days. What hatches is random: its element, colour, ears, pattern, tail and eyes. Every egg looks the same, so nothing gives the result away.
+
+**Growing.** Each day's growth points are EXP: up to 10 a day, plus 1 during a streak of 3 or more days. Every 7 EXP after hatching is a level. Pets grow from Baby to Junior at Lv 5, and to Adult at Lv 10. Each growth element also trains one stat:
+
+| Your day | Trains |
+|---|---|
+| ☀️ Steps | ⚔️ Attack |
+| 💧 Sleep | ❤️ HP |
+| 🍃 A calm resting heart rate | 🛡️ Defense |
+| 🌱 Active energy or exercise | 💨 Speed |
+
+**Mood.** Today's numbers also set how the pet feels in today's battles:
+
+- 😪 **Sleepy:** under about 6 h of sleep. The pet is slower and sometimes yawns instead of acting.
+- 💪 **Pumped:** 10,000 steps. +15% attack.
+- 🎯 **Focused:** a calm heart. More critical hits.
+- 🏜️ **Sluggish:** no data yet today. −10% to everything.
+
+**Battles.** Every day, each hatched pet fights every other one once, and the faster pet moves first. Each turn it picks a skill: it heals when its HP is low, sometimes uses a status move, and otherwise attacks with its strongest skill.
+
+Elements work in a circle: 💧 Water douses 🔥 Fire, 🔥 Fire burns 🍃 Leaf, 🍃 Leaf grounds ⚡ Spark, and ⚡ Spark shocks 💧 Water. An attack on the element it beats does 1.5× damage; the other way round it does 0.7×. Moves that stun are limited per battle, so no pet can be kept from moving for a whole fight.
+
+The page shows today's battles with a play-by-play, and a head-to-head table for the season. The most wins at the end of the season takes the title; a tie goes to the higher EXP.
+
+**Rarity and skills.** Rarity is rolled at hatching. Rarer pets have slightly higher stats and extra skills; the bonus is kept small so that habits matter more than luck. There is also a 1 in 20 chance that a pet is shiny: a different colour, with no other effect.
+
+<img src="docs/rarities.png" width="640" alt="A pet of each rarity with its skills">
+
+| Rarity | Odds | Extra |
+|---|---|---|
+| Common | 65% | — |
+| Rare | 25% | 1 rare skill, +2% stats |
+| Epic | 8% | 1 rare skill and 1 epic skill, +4% stats |
+| Legendary | 2% | Starry Puff or Rainbow Puff, with its own skill, plus a rare skill and an epic skill, +6% stats |
+
+Each element has three skills of its own, unlocked at Lv 1, 5 and 10:
+
+| Element | Lv 1 | Lv 5 | Lv 10 |
+|---|---|---|---|
+| 💧 Water | 🫧 Bubble Rush | 🌦️ Healing Drizzle: heals more the better you slept | 🌊 Tide Shield: halves the next hit |
+| 🔥 Fire | 🔥 Ember Puff | ♨️ Scorch: burns for 3 turns | ☄️ Blaze Dash: 1.5× damage, with recoil |
+| 🍃 Leaf | 🍃 Leaf Twirl | 🌞 Photosynthesis: heals more the more you walked today | 🌿 Vine Bind: the foe may lose a turn |
+| ⚡ Spark | ⚡ Zap Pop | ✴️ Double Flash: two hits | 🌀 Static Jolt: the foe may freeze for 3 turns |
+
+Rarer pets also get skills that depend on how you lived today:
+
+| Skill | Tier | Effect |
+|---|---|---|
+| 🔥 Streak Spirit | Rare | +6% damage per streak day, up to +30% |
+| 😴 Nap Counter | Rare | When it would yawn, it counterattacks instead |
+| 💦 Sweat Armor | Rare | −20% damage taken when today's activity is on target |
+| 🏃 10k-Step Charge | Epic | Damage grows with today's steps, up to 2.5× at 10,000 |
+| 🛌 Deep Sleep | Epic | Gets back up once when knocked out: 40% HP after 7+ h of sleep, else 20% |
+| 🧘 Still Heart | Epic | The calmer your heart, the likelier it dodges, up to 30% |
+| 🌠 Meteor Shower | Legendary (Starry Puff) | Three hits that ignore shields |
+| 🌈 Rainbow Beam | Legendary (Rainbow Puff) | 1.5× damage, unaffected by elements |
+
+Pets, battles and their logs are worked out from names and dates. Every time the page is made, the results are the same.
+
+### Garden
 
 <img src="docs/garden.png" width="640" alt="Garden page with three players">
 
-*Made-up players.*
-
-### How it works
-
-1. **Players.** Each player is a file `health-<name>.txt` in the shared folder. If you are the host, your own data is used too, under the name set in the menu.
-2. **Choosing a plant.** A player chooses a plant by adding a line such as `plant: tomato` or `植物: 番茄` to their file. The host chooses in the menu. The first plant named in a season is kept until the season ends.
-3. **The page.** On the host's Mac, turn on **Garden › Make the garden page on this Mac**. The page is rewritten only when someone's numbers change.
-4. **No AI.** The garden uses fixed formulas, so none of the players' numbers are sent to MiniMax for it.
+Each player grows a plant. A player chooses it by adding a line such as `plant: tomato` or `植物: 番茄` to their file; the host chooses in the menu. The first plant named in a season is kept until the season ends.
 
 **Rules**
 
@@ -179,45 +278,17 @@ Each element scores from 0 to 1. Daily growth is 10 × the four elements weighte
 
 The stages are Seed 0 → Sprout 8 → Seedling 25 → Leafy 45 → Blooming 70 → Fruiting 100 → Harvest 130 points. A season lasts 14 days, and a run of good days reaches Fruiting by the end. The highest score at the end of the season wins.
 
-### Set up for each player
 
-1. The host creates a folder named `HealthGlance` in iCloud Drive and shares it with each player, giving them permission to make changes.
-2. Each player builds this shortcut on their own iPhone. They paste the description into the Shortcuts app (iOS 27), replacing `<name>` and the plant with their own:
-
-```text
-Create a shortcut named "Garden Export" that does these steps in order:
-1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
-2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
-3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
-4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
-5. Make a Text with exactly these five lines, putting each result after its colon:
-plant: tomato
-steps: the result of step 1
-sleep: the result of step 2
-resting heart rate: the result of step 3
-active energy: the result of step 4
-6. Save File: save the text into the shared folder "HealthGlance" in iCloud Drive, as health-<name>.txt. Do not ask where to save. Overwrite the file if it exists.
-Do not use "in the last 1 day" for any date filter.
-```
-
-If the generated **Save File** action does not point to the shared folder, tap its folder and choose `HealthGlance` by hand. Each player then runs the shortcut once by hand and adds an automation that runs it when they open an app every day, as in Step 5 above.
-
-### Notes
-
-- **One host only.** Only one Mac should make the page. If two Macs rewrite the same file in a shared folder, iCloud keeps conflicting copies.
-- **Language:** the page uses the host's language setting.
-- **Dates:** each day follows the host's time zone.
-- **Privacy:** everyone in the folder can see everyone's daily numbers.
-
-Garden settings in `config.json`:
+### Game settings in `config.json`
 
 | Setting | Meaning |
 |---|---|
+| `gameMode` | `pets` (Puff Battles, the default) or `garden` |
 | `gardenHost` | Whether this Mac makes the page |
 | `gardenName` | Your name on the page |
-| `gardenPlant` | Your plant |
+| `gardenPlant` | Your plant (Garden) |
 | `gardenDays` | Season length in days (default 14) |
-| `gardenStart` | First day of season 1, as `yyyy-MM-dd`. It is filled in automatically the first time the garden runs. |
+| `gardenStart` | First day of season 1, as `yyyy-MM-dd`. It is filled in automatically the first time the game runs. |
 
 ## When summaries are made
 
@@ -255,7 +326,9 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli sample/2026-10-31.txt --generate    # also call MiniMax; prints, writes nothing
 ./build/healthwidget-cli --generate --save                   # newest data → summary.json, as the app does
 ./build/healthwidget-cli --sources                           # what the source test found
-./build/healthwidget-cli --garden                            # update the garden page now
+./build/healthwidget-cli --garden                            # update the game page now
+./build/healthwidget-cli --pets-demo --lang en               # made-up players → build/pets-demo.html
+./build/healthwidget-cli --pets-gallery --lang en            # one pet of each rarity → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html
 ```
 
@@ -279,7 +352,8 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 | `Sources/Shared/CardView.swift` | The card UI, shared by the widget and the pinned card |
 | `Sources/App/Engine.swift` | MiniMax call and prompts (English and Chinese) |
 | `Sources/App/App.swift` | Menu-bar app: watching for data, generating, pinned card, launch at login |
-| `Sources/App/Garden.swift` | Garden PK: rules, ledger, garden page |
+| `Sources/App/Garden.swift` | Games with friends: ledger, seasons, Garden rules and page |
+| `Sources/App/Pets.swift` | Puff Battles: hatching, skills, battles, page |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |
 | `Sources/CLI/main.swift` | Command-line test tool |
 | `build.sh` | Build, sign, install |

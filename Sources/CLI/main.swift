@@ -7,19 +7,51 @@ import Foundation
 
 let args = Array(CommandLine.arguments.dropFirst())
 L.lang = Config.load().language
+if args.contains("--pets-demo") {
+    let today = HealthParser.dateFmt.string(from: Date())
+    var cfg = Config.load()
+    if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    cfg.gardenName = "小雨"
+    cfg.gardenStart = Garden.add(today, -8)
+    let out = URL(fileURLWithPath: "build/pets-demo.html")
+    try! Pets.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
+    print(out.path); exit(0)
+}
+if args.contains("--pets-gallery") {
+    // one made-up player per rarity / legendary species, to look at every kind of pet
+    let today = HealthParser.dateFmt.string(from: Date())
+    var cfg = Config.load()
+    if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
+    var wanted: [String: String] = [:]
+    for n in 1...3000 {
+        let pet = Pet.hatch("Player \(n)", season: 1)
+        let key = pet.species > 0 ? "s\(pet.species)" : "r\(pet.rarity)"
+        if wanted[key] == nil { wanted[key] = "Player \(n)" }
+        if wanted.count == 5 { break }
+    }
+    var l = Ledger()
+    for (_, name) in wanted {
+        for i in 0..<9 { l.players[name, default: [:]][Garden.add(today, i - 8)] = GardenDay(metrics: ["steps": 9000 + Double(i * 300), "sleep_h": 7.5, "active_kcal": 480, "resting_hr": 60], plant: nil) }
+    }
+    cfg.gardenStart = Garden.add(today, -8)
+    let out = URL(fileURLWithPath: "build/pets-gallery.html")
+    try! Pets.render(l, cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
+    print(out.path, wanted); exit(0)
+}
 if args.contains("--garden-demo") {
     // made-up players into build/garden-demo.html; the real ledger is not touched
     let today = HealthParser.dateFmt.string(from: Date())
     var cfg = Config.load()
     if let i = args.firstIndex(of: "--lang"), i + 1 < args.count { cfg.language = args[i + 1] }
     cfg.gardenName = "小雨"
+    cfg.gardenStart = Garden.add(today, -8)
     let out = URL(fileURLWithPath: "build/garden-demo.html")
     try! Garden.render(Garden.demoLedger(today: today), cfg: cfg, today: today, now: Date()).write(to: out, atomically: true, encoding: .utf8)
     print(out.path); exit(0)
 }
 if args.contains("--garden") {
     let page = Garden.update(cfg: Config.load())
-    print(page.map { "写入 \($0.path)" } ?? "没有变化：\(Garden.pageURL.path)"); exit(0)
+    print(page.map { "写入 \($0.path)" } ?? "没有变化：\(Garden.pageURL().path)"); exit(0)
 }
 if args.contains("--sources") {
     guard let r = Sources.latest() else { print("没有找到 sources.txt"); exit(1) }

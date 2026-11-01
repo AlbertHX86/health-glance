@@ -86,9 +86,10 @@ enum Garden {
     static let lastInputURL = dir.appendingPathComponent("last-input.json")
     static var sharedFolder: URL { Paths.inboxes[1] }
 
-    /// Where the page goes: the shared folder when it exists, else a local copy.
-    static var pageURL: URL {
-        FileManager.default.fileExists(atPath: sharedFolder.path) ? sharedFolder.appendingPathComponent("garden.html") : dir.appendingPathComponent("garden.html")
+    /// Where the page goes: the shared folder when it exists, else a local copy. pets.html or garden.html by game mode.
+    static func pageURL(_ cfg: Config = Config.load()) -> URL {
+        let name = cfg.gameMode == "garden" ? "garden.html" : "pets.html"
+        return FileManager.default.fileExists(atPath: sharedFolder.path) ? sharedFolder.appendingPathComponent(name) : dir.appendingPathComponent(name)
     }
 
     // MARK: rules
@@ -203,10 +204,10 @@ enum Garden {
         // rewrite only when the page's inputs changed, so the shared folder is not touched every minute
         let enc = JSONEncoder()
         enc.outputFormatting = .sortedKeys  // dictionary order differs between runs; the comparison must not
-        let input = "\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
-        let page = pageURL
+        let input = "\(cfg.gameMode)|\(today)|\(cfg.language)|\(cfg.gardenDays)|\(cfg.gardenStart ?? "")|\(cfg.gardenName)|" + (String(data: (try? enc.encode(ledger)) ?? Data(), encoding: .utf8) ?? "")
+        let page = pageURL(cfg)
         if (try? String(contentsOf: lastInputURL, encoding: .utf8)) == input, FileManager.default.fileExists(atPath: page.path) { return nil }
-        let html = render(ledger, cfg: cfg, today: today, now: Date())
+        let html = cfg.gameMode == "garden" ? render(ledger, cfg: cfg, today: today, now: Date()) : Pets.render(ledger, cfg: cfg, today: today, now: Date())
         do {
             try html.write(to: page, atomically: true, encoding: .utf8)
             try input.write(to: lastInputURL, atomically: true, encoding: .utf8)

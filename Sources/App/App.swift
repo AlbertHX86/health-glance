@@ -24,7 +24,8 @@ final class Model: ObservableObject {
     @Published var gardenHost = Config.load().gardenHost
     @Published var gardenName = Config.load().gardenName
     @Published var gardenPlant = Config.load().gardenPlant
-    @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL.path) ? Garden.pageURL : nil
+    @Published var gameMode = Config.load().gameMode
+    @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL().path) ? Garden.pageURL() : nil
     private var lastAuto: [String: Date] = [:]
     private var timer: Timer?
 
@@ -94,7 +95,7 @@ final class Model: ObservableObject {
         let cfg = Config.load()
         guard cfg.gardenHost else { return }
         Garden.update(cfg: cfg)
-        gardenPage = FileManager.default.fileExists(atPath: Garden.pageURL.path) ? Garden.pageURL : nil
+        gardenPage = FileManager.default.fileExists(atPath: Garden.pageURL(cfg).path) ? Garden.pageURL(cfg) : nil
     }
 
     func saveGarden() {
@@ -103,6 +104,7 @@ final class Model: ObservableObject {
         if !name.isEmpty, name != c.gardenName { Garden.rename(from: c.gardenName, to: name); c.gardenName = name }
         c.gardenHost = gardenHost
         c.gardenPlant = gardenPlant
+        c.gameMode = gameMode
         try? c.save()
         updateGarden()
     }
@@ -209,19 +211,26 @@ struct MainView: View {
                     .padding(.top, 4)
                 }
             }
-            DisclosureGroup(t("Garden", "菜园")) {
+            DisclosureGroup(t("Game", "游戏")) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle(t("Make the garden page on this Mac", "由这台 Mac 生成菜园页面"),
+                    Picker(t("Game", "游戏"), selection: Binding(get: { model.gameMode }, set: { model.gameMode = $0; model.saveGarden() })) {
+                        Text(t("🥚 Puff battles", "🥚 团团对战")).tag("pets")
+                        Text(t("🌱 Garden", "🌱 菜园")).tag("garden")
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle(t("Make the game page on this Mac", "由这台 Mac 生成游戏页面"),
                            isOn: Binding(get: { model.gardenHost }, set: { model.gardenHost = $0; model.saveGarden() }))
                     HStack {
                         Text(t("Your name", "你的名字"))
                         TextField("", text: $model.gardenName).textFieldStyle(.roundedBorder).onSubmit { model.saveGarden() }
                     }
+                    if model.gameMode == "garden" {
                     Picker(t("Your plant", "你的植物"), selection: Binding(get: { model.gardenPlant }, set: { model.gardenPlant = $0; model.saveGarden() })) {
                         ForEach(Plant.all, id: \.id) { Text("\($0.emoji) \($0.name(model.lang))").tag($0.id) }
                     }
+                    }
                     HStack {
-                        Button(t("Open Garden", "打开菜园")) { if let u = model.gardenPage { NSWorkspace.shared.open(u) } }
+                        Button(t("Open Page", "打开页面")) { if let u = model.gardenPage { NSWorkspace.shared.open(u) } }
                             .disabled(model.gardenPage == nil)
                         Spacer()
                     }

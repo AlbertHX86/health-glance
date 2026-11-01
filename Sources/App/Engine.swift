@@ -9,6 +9,7 @@ struct Config: Codable {
     var language = "en"  // "en" or "zh": the app, the widget, the summary and the garden page
     // garden: only one Mac should host (write garden.html into the shared folder)
     var gardenHost = false
+    var gameMode = "pets"  // "pets" (Puff battles) or "garden"
     var gardenName = NSFullUserName().isEmpty ? "Me" : NSFullUserName()
     var gardenPlant = "strawberry"
     var gardenDays = 14
@@ -26,6 +27,7 @@ struct Config: Codable {
         reasoningEffort = try c.decodeIfPresent(String.self, forKey: .reasoningEffort) ?? d.reasoningEffort
         language = try c.decodeIfPresent(String.self, forKey: .language) ?? d.language
         gardenHost = try c.decodeIfPresent(Bool.self, forKey: .gardenHost) ?? d.gardenHost
+        gameMode = try c.decodeIfPresent(String.self, forKey: .gameMode) ?? d.gameMode
         gardenName = try c.decodeIfPresent(String.self, forKey: .gardenName) ?? d.gardenName
         gardenPlant = try c.decodeIfPresent(String.self, forKey: .gardenPlant) ?? d.gardenPlant
         gardenDays = max(3, try c.decodeIfPresent(Int.self, forKey: .gardenDays) ?? d.gardenDays)
