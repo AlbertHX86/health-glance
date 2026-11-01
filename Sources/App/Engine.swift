@@ -129,7 +129,18 @@ enum Engine {
         let cfg = Config.load()
         guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
         guard let url = file ?? HealthParser.latestFile(person: person), let day = HealthParser.read(url) else { throw EngineError.noData }
-        let all = try persist ? History.upsert(day) : History.load(day.person).filter { $0.date != day.date } + [day]
+        // a many-day file (the last 30 days) fills in the history before today is added
+        let earlier = HealthParser.readDays(url).filter { $0.date < day.date }
+        if persist, !earlier.isEmpty { _ = try History.merge(earlier, person: day.person) }
+        let all: [DayRecord]
+        if persist {
+            all = try History.upsert(day)
+        } else {
+            var byDate = Dictionary(History.load(day.person).map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+            for e in earlier { byDate[e.date] = e }
+            byDate[day.date] = nil
+            all = byDate.values.sorted { $0.date < $1.date } + [day]
+        }
         let avg = History.weekAverage(all, before: day.date)
         let days = all.filter { $0.date < day.date }.suffix(7).count
         let lang = cfg.language == "zh" ? "zh" : "en"
@@ -159,23 +170,31 @@ enum Engine {
     You are the user's personal health-data assistant. Answer the user's question from their Health data below: daily numbers for recent days and today's summary and checklist.
     Rules: use only this data and general health knowledge, and say so when the data cannot answer. Quote specific numbers. Friendly and concise. No medical diagnosis; for symptoms or worrying numbers, suggest seeing a doctor. Answer in English.
     When the user asks for suggestions, advice or a plan, put the concrete steps in "tasks": 1 to 6 things to do today or tonight, each at most 8 words with a time or an amount, not already on the checklist. They are added to the user's checklist, so the answer only needs to introduce them briefly. For any other question, "tasks" is empty.
-    When the user asks to see, show, compare or chart a metric over time, also set "chart" to {"metric": one of steps, sleep_h, resting_hr, active_kcal, exercise_min, hrv, distance_km, stand_h, weight, "days": 7, 30, 90, 365 or 730}; the app draws it next to the answer. Otherwise leave "chart" out.
-    Output one JSON object and nothing else: {"answer": "plain text, at most 80 words", "tasks": ["..."], "chart": {...}}
+    When a chart would help — the user asks to see, compare or track something, or asks how something has changed — add "charts": one or two of {"type": "bar" or "line", "metric": one of steps, sleep_h, resting_hr, active_kcal, exercise_min, hrv, distance_km, stand_h, weight, "days": 7 to 730, "goal": an optional target in the metric's unit}. Use "bar" for daily totals over a few weeks (steps, energy), "line" for trends and longer ranges; add a goal when the user names one or a common target fits (8,000 steps, 7.5 hours of sleep). The app draws them under the answer from the user's data, so do not list the numbers day by day. Otherwise leave "charts" out.
+    Output one JSON object and nothing else: {"answer": "plain text, at most 80 words", "tasks": ["..."], "charts": [...]}
     """
     static let askZH = """
     你是用户的私人健康数据助手。根据下面的健康数据回答用户的问题：最近几天每天的数字，以及今天的小结和清单。
     要求：只依据这些数据和一般健康常识，数据回答不了时直说；引用具体数字；语气友好、简洁；不做医学诊断，有症状或数字令人担心时建议就医。用简体中文回答。
     用户要建议、要计划时，把具体步骤放进 "tasks"：今天或今晚要做的 1 到 6 件事，每条不超过 16 个汉字，带时间或数量，不要和清单里已有的重复。这些会加进用户的清单，所以回答里简单介绍一下即可。其他问题 "tasks" 为空。
-    用户想看、比较某个指标随时间的变化，或者要画图时，再设置 "chart" 为 {"metric": steps、sleep_h、resting_hr、active_kcal、exercise_min、hrv、distance_km、stand_h、weight 之一, "days": 7、30、90、365 或 730}，App 会在回答旁边画出来。其他情况不要写 "chart"。
-    只输出一个 JSON 对象，不要其他文字：{"answer": "纯文本，不超过 120 个汉字", "tasks": ["..."], "chart": {...}}
+    图表有帮助时（用户想看、比较、跟踪某项数据，或者问某项数据怎么变化），加上 "charts"：一到两个 {"type": "bar" 或 "line", "metric": steps、sleep_h、resting_hr、active_kcal、exercise_min、hrv、distance_km、stand_h、weight 之一, "days": 7 到 730, "goal": 可选的目标值，用该指标的单位}。几周内的每日总量（步数、能量）用 "bar"，趋势和更长的时间用 "line"；用户提到目标、或者有常见目标（8000 步、睡 7.5 小时）时加上 goal。App 会用用户的数据画在回答下面，所以不要逐日列出数字。其他情况不要写 "charts"。
+    只输出一个 JSON 对象，不要其他文字：{"answer": "纯文本，不超过 120 个汉字", "tasks": ["..."], "charts": [...]}
     """
 
     /// Answer one question about one person's data (nil = you); each question stands alone. Asked for suggestions or a
     /// plan, the model also returns tasks for the checklist.
+    /// A chart the model asks for, drawn by the app from the person's data.
+    struct ChartSpec: Hashable {
+        var type: String  // "bar" or "line"
+        var metric: String
+        var days: Int
+        var goal: Double?
+    }
+
     struct Answer {
         var answer: String
         var tasks: [String] = []
-        var chart: (metric: String, days: Int)?
+        var charts: [ChartSpec] = []
     }
 
     static func ask(_ question: String, person: String? = nil) async throws -> Answer {
@@ -210,12 +229,14 @@ enum Engine {
         let reply = try await chat(cfg, messages: msgs + [["role": "user", "content": question]])
         guard let obj = jsonObject(in: reply), let answer = obj["answer"] as? String else { return Answer(answer: reply) }
         let tasks = ((obj["tasks"] as? [String]) ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        var chart: (String, Int)?
-        if let c = obj["chart"] as? [String: Any], let m = c["metric"] as? String, Metrics.byKey[m] != nil {
-            let d = (c["days"] as? Int) ?? Int((c["days"] as? Double) ?? 30)
-            chart = (m, [7, 30, 90, 365, 730].min { abs($0 - d) < abs($1 - d) }!)  // the chart's ranges
+        let raw = (obj["charts"] as? [[String: Any]]) ?? ((obj["chart"] as? [String: Any]).map { [$0] } ?? [])
+        let charts = raw.compactMap { c -> ChartSpec? in
+            guard let m = c["metric"] as? String, Metrics.byKey[m] != nil else { return nil }
+            let days = (c["days"] as? NSNumber)?.intValue ?? 30
+            let goal = (c["goal"] as? NSNumber)?.doubleValue
+            return ChartSpec(type: (c["type"] as? String) == "bar" ? "bar" : "line", metric: m, days: min(730, max(7, days)), goal: goal)
         }
-        return Answer(answer: answer, tasks: Array(tasks.prefix(6)), chart: chart)
+        return Answer(answer: answer, tasks: Array(tasks.prefix(6)), charts: Array(charts.prefix(2)))
     }
 
     static func chat(_ cfg: Config, messages: [[String: Any]]) async throws -> String {

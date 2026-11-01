@@ -158,7 +158,9 @@ enum HealthParser {
         Array(Set(files().compactMap { person(of: $0.url) })).sorted()
     }
 
+    /// The newest day in a file: the last day of a many-day file, or the one day of a "key: value" file.
     static func read(_ url: URL) -> DayRecord? {
+        if let last = readDays(url).last { return last }
         guard let data = try? Data(contentsOf: url), let raw = String(data: data, encoding: .utf8) else { return nil }
         let text = plainText(raw)
         var metrics: [String: Double] = [:]
@@ -182,6 +184,57 @@ enum HealthParser {
             metrics[def.key] = x
         }
         return DayRecord(date: date, metrics: metrics, raw: String(text.prefix(4000)), file: url.lastPathComponent, person: person(of: url), plant: plant)
+    }
+
+    /// A file with a line per day and metric, as the shortcut writes for the last 30 days:
+    ///
+    ///     2026-10-30 步数: 8123                          a day's total (Find Health Samples, grouped by day)
+    ///     2026-10-31 06:42 睡眠 (Apple Watch): 1800       a stretch of sleep: when it ended, its length in seconds
+    ///
+    /// Sleep belongs to the day you wake up (a stretch ending after 18:00 counts for the next day). When several sources
+    /// recorded a night, the largest total counts, so an iPhone and a Watch are not added together. Returns the days in
+    /// date order, or nothing for a one-day "key: value" file.
+    static func readDays(_ url: URL) -> [DayRecord] {
+        guard let data = try? Data(contentsOf: url), let raw = String(data: data, encoding: .utf8) else { return [] }
+        let stamp = DateFormatter()
+        stamp.locale = Locale(identifier: "en_US_POSIX")
+        stamp.dateFormat = "yyyy-MM-dd HH:mm"
+        var metrics: [String: [String: Double]] = [:]
+        var sleep: [String: [String: Double]] = [:]  // day → source → seconds
+        var lines: [String: [String]] = [:]
+        var plant: String?
+        for line in plainText(raw).components(separatedBy: .newlines) {
+            if let p = line.firstMatch(#"(?i)^\s*(植物|plant|作物|crop)\s*[:：=]\s*(.+?)\s*$"#) { plant = p[2]; continue }
+            guard let m = line.firstMatch(#"^\s*(\d{4}-\d{1,2}-\d{1,2})(?:[ T](\d{1,2}:\d{2})(?::\d{2})?)?\s+([^:：=]+?)\s*[:：=]\s*(.+?)\s*$"#),
+                  let date = firstDate(m[1]) else { continue }
+            var key = m[3], source = ""
+            if let s = key.firstMatch(#"^(.+?)\s*[(（](.*)[)）]$"#) { key = s[1]; source = s[2] }
+            guard let def = Metrics.match(key) else { continue }
+            lines[date, default: []].append(line.trimmingCharacters(in: .whitespaces))
+            if def.key == "sleep_h", !m[2].isEmpty, let end = stamp.date(from: "\(date) \(m[2])"), let secs = seconds(m[4]) {
+                let day = dateFmt.string(from: end.addingTimeInterval(6 * 3600))
+                sleep[day, default: [:]][source, default: 0] += secs
+            } else if let x = value(def.key, m[4]) {
+                metrics[date, default: [:]][def.key] = x
+            }
+        }
+        for (day, bySource) in sleep { metrics[day, default: [:]]["sleep_h"] = bySource.values.max()! / 3600 }
+        let name = person(of: url)
+        return metrics.keys.sorted().compactMap { d in
+            let m = metrics[d]!.filter { Metrics.plausible[$0.key]?.contains($0.value) ?? true }
+            return m.isEmpty ? nil : DayRecord(date: d, metrics: m, raw: (lines[d] ?? []).joined(separator: "\n"),
+                                              file: url.lastPathComponent, person: name, plant: plant)
+        }
+    }
+
+    /// A length of time in seconds: "1800", "30 min", "1 小时 5 分钟", "0:30:00".
+    static func seconds(_ s: String) -> Double? {
+        let t = s.replacingOccurrences(of: ",", with: "").lowercased()
+        if let c = t.firstMatch(#"(\d+):(\d{2}):(\d{2})"#) { return Double(c[1])! * 3600 + Double(c[2])! * 60 + Double(c[3])! }
+        func part(_ units: String) -> Double? { t.firstMatch(#"(\d+(\.\d+)?)\s*("# + units + ")").flatMap { Double($0[1]) } }
+        let h = part(#"小时|hours?\b|hrs?\b|h\b"#), m = part(#"分钟|分|minutes?\b|mins?\b|m\b"#), sec = part(#"秒|seconds?\b|secs?\b|s\b"#)
+        if h != nil || m != nil || sec != nil { return (h ?? 0) * 3600 + (m ?? 0) * 60 + (sec ?? 0) }
+        return t.firstMatch(#"\d+(\.\d+)?"#).flatMap { Double($0[0]) }  // a bare number is seconds, as Shortcuts writes a duration
     }
 
     static func fileDate(_ url: URL) -> String? { firstDate(url.lastPathComponent) }

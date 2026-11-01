@@ -70,15 +70,6 @@ if args.contains("--sources") {
     for c in r.counts { print("  \(c.n)\t\(c.name)") }
     exit(0)
 }
-if let i = args.firstIndex(of: "--import"), i + 1 < args.count {
-    // --import export.zip|export.xml: add the Health app's export to your history
-    do {
-        let t0 = Date()
-        let r = try HealthImport.run(URL(fileURLWithPath: args[i + 1])) { n in print("已读 \(n) 条记录") }
-        print(String(format: "导入 %d 天（%@ 至 %@），%.1f 秒", r.days, r.first, r.last, Date().timeIntervalSince(t0)))
-    } catch { print("失败：\(error.localizedDescription)"); exit(1) }
-    exit(0)
-}
 if let i = args.firstIndex(of: "--ask"), i + 1 < args.count {
     // --ask "question" [--person name]: answer a question about your data (or that person's)
     let person = args.firstIndex(of: "--person").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
@@ -88,7 +79,7 @@ if let i = args.firstIndex(of: "--ask"), i + 1 < args.count {
             let r = try await Engine.ask(args[i + 1], person: person)
             print(r.answer)
             if !r.tasks.isEmpty { print("\n清单：\n" + r.tasks.map { "- " + $0 }.joined(separator: "\n")) }
-            if let c = r.chart { print("\n图表：\(c.metric)，\(c.days) 天") }
+            for c in r.charts { print("\n图表：\(c.type) \(c.metric)，\(c.days) 天" + (c.goal.map { "，目标 \($0)" } ?? "")) }
         } catch { print("失败：\(error.localizedDescription)") }
         sem.signal()
     }

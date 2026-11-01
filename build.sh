@@ -21,7 +21,7 @@ APP=$B/HealthWidget.app; A=$APP/Contents; X=$A/PlugIns/HealthWidgetExtension.app
 rm -rf $APP; mkdir -p $A/MacOS $X/MacOS
 swiftc "${O[@]}" -parse-as-library Sources/Shared/*.swift Sources/App/*.swift -o $A/MacOS/HealthWidget
 swiftc "${O[@]}" -parse-as-library -application-extension Sources/Shared/*.swift Sources/Widget/*.swift -o $X/MacOS/HealthWidgetExtension
-swiftc "${O[@]}" Sources/Shared/Health.swift Sources/App/Engine.swift Sources/App/Garden.swift Sources/App/Pets.swift Sources/App/Sprites.swift Sources/App/Invite.swift Sources/App/HealthImport.swift Sources/CLI/main.swift -o $B/healthwidget-cli
+swiftc "${O[@]}" Sources/Shared/Health.swift Sources/App/Engine.swift Sources/App/Garden.swift Sources/App/Pets.swift Sources/App/Sprites.swift Sources/App/Invite.swift Sources/CLI/main.swift -o $B/healthwidget-cli
 cp Resources/App-Info.plist $A/Info.plist
 cp Resources/Widget-Info.plist $X/Info.plist
 codesign -f -s - --entitlements Resources/Widget.entitlements $A/PlugIns/HealthWidgetExtension.appex

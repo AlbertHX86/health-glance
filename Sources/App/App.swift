@@ -17,15 +17,6 @@ final class Model: ObservableObject {
     }
     /// The history of the person shown, for the trend chart.
     @Published var history: [DayRecord] = []
-    @Published var trendMetric = UserDefaults.standard.string(forKey: "trendMetric") ?? "steps" {
-        didSet { UserDefaults.standard.set(trendMetric, forKey: "trendMetric") }
-    }
-    @Published var trendDays = UserDefaults.standard.object(forKey: "trendDays") as? Int ?? 30 {
-        didSet { UserDefaults.standard.set(trendDays, forKey: "trendDays") }
-    }
-    @Published var showTrends = UserDefaults.standard.object(forKey: "showTrends") as? Bool ?? false {  // the island always shows it; the menu keeps it folded so it fits small screens
-        didSet { UserDefaults.standard.set(showTrends, forKey: "showTrends") }
-    }
     @Published var sources = Sources.latest()
     @Published var status = ""
     @Published var busy = false
@@ -51,6 +42,7 @@ final class Model: ObservableObject {
         let id = UUID()
         let q: String
         var a: String
+        var charts: [Engine.ChartSpec] = []
     }
     @Published var gardenPage: URL? = FileManager.default.fileExists(atPath: Garden.pageURL().path) ? Garden.pageURL() : nil
     private var lastAuto: [String: Date] = [:]
@@ -82,32 +74,6 @@ final class Model: ObservableObject {
     /// summary's. The shortcut rewrites the file on every app open, so automatic runs per person are at least 30 min
     /// apart; a manual run does not count. One generation at a time: each one ends by checking again.
     func reloadHistory() { history = History.load(Self.person(selected)) }
-
-    /// Pick the Health app's export (export.zip, or the export.xml in it) and add its days to your history.
-    func importExport() {
-        NSApp.activate(ignoringOtherApps: true)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.zip, .xml]
-        panel.message = L.t("Choose the Health export: on the iPhone, Health › your picture › Export All Health Data, then AirDrop or save export.zip to this Mac.",
-                            "选择健康导出文件：在 iPhone 上打开「健康」› 右上角头像 › 导出所有健康数据，再用隔空投送或存到这台 Mac。")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        status = L.t("Importing…", "正在导入…")
-        Task.detached {
-            let result: String
-            do {
-                let r = try HealthImport.run(url) { n in
-                    Task { @MainActor in self.status = L.t("Importing… \(n.formatted()) records", "正在导入… 已读 \(n.formatted()) 条记录") }
-                }
-                result = L.t("Imported \(r.days) days (\(r.first) – \(r.last))", "已导入 \(r.days) 天（\(r.first) 至 \(r.last)）")
-            } catch {
-                result = L.t("Import failed: ", "导入失败：") + error.localizedDescription
-            }
-            await MainActor.run {
-                self.status = result
-                self.reloadHistory()
-            }
-        }
-    }
 
     func check() {
         Self.downloadPlaceholders()
@@ -254,11 +220,7 @@ final class Model: ObservableObject {
                 a = r.answer
                 let n = addTasks(r.tasks, person: person)
                 if n > 0 { a += "\n\n" + L.t("＋ Added \(n) to Suggestions", "＋ 已加入建议清单 \(n) 条") }
-                if let c = r.chart {
-                    trendMetric = c.metric
-                    trendDays = c.days
-                    showTrends = true
-                }
+                if answer?.q == q { answer?.charts = r.charts }
             } catch { a = error.localizedDescription }
             if answer?.q == q { answer?.a = a }
             asking = false
@@ -317,9 +279,6 @@ struct MainView: View {
             }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
             AskView(model: model)
-            DisclosureGroup(t("Trends", "趋势"), isExpanded: $model.showTrends) {
-                TrendsView(model: model).padding(.top, 6)
-            }
             HStack(spacing: 8) {
                 Button {
                     model.generate()
@@ -527,8 +486,13 @@ struct AskView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxHeight: 220)
+                .frame(maxHeight: 200)
                 .fixedSize(horizontal: false, vertical: true)
+                // charts the model asked for, drawn here from the data
+                ForEach(qa.charts, id: \.self) { c in
+                    ChartBlock(spec: c, history: model.history, today: model.summary, lang: model.lang)
+                        .transition(.opacity)
+                }
             }
             HStack(spacing: 6) {
                 TextField(t("Ask about your health…", "问问你的健康数据…"), text: $model.question)

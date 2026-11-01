@@ -3,8 +3,8 @@ import SwiftUI
 
 /// A Dynamic Island at the top centre of the screen the pointer is on. It stays hidden until the pointer rests there;
 /// then an icon and today's steps appear around the notch (or as a black pill of the same shape where there is no
-/// notch). A click opens it into the card with its checklist, the question box and the trend chart; a click outside, or
-/// Esc, closes it.
+/// notch). A click opens it into the card with its checklist and the question box, whose answers can carry charts; a
+/// click outside, or Esc, closes it.
 @MainActor
 final class Island: ObservableObject {
     static let shared = Island()
@@ -195,7 +195,6 @@ struct IslandView: View {
                     CardView(summary: model.summary, size: .large, lang: model.summary?.lang ?? model.lang) { model.toggleTip($0) }
                         .frame(minHeight: CardSize.large.frame.height - 2 * WidgetStyle.margin, alignment: .top)
                     AskView(model: model)
-                    TrendsView(model: model)
                 }
                 .padding(.horizontal, WidgetStyle.margin + 2)
                 .padding(.top, 6)

@@ -11,32 +11,30 @@ enum Invite {
     static func shortcutDescription(_ lang: String) -> String {
         lang == "zh" ? """
         创建一个名为「HealthGlance 上传」的快捷指令，按顺序执行以下步骤：
-        1. 查找健康样本，条件：类型是步数，开始日期是今天。然后计算统计数据：总和。
-        2. 查找健康样本，条件：类型是睡眠分析，结束日期是今天，值不是清醒，值不是在床上。然后获取健康样本的详细信息：时长。然后计算统计数据：总和。
-        3. 查找健康样本，条件：类型是静息心率，按开始日期排序，最新的在前，限制为 1 个。
-        4. 查找健康样本，条件：类型是活动能量，开始日期是今天。然后计算统计数据：总和。
-        5. 获取设备详细信息：设备名称。
-        6. 添加一个文本，内容只有下面四行，冒号后面放对应步骤的结果：
-        步数: 第 1 步的结果
-        睡眠: 第 2 步的结果
-        静息心率: 第 3 步的结果
-        活动能量: 第 4 步的结果
-        7. 存储文件：存储位置选 iCloud 云盘最外层的「HealthGlance」文件夹（不是「快捷指令」文件夹里面），子路径只填文件名：「health-」加上第 5 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
-        所有日期条件都不要用「在最近 1 天」。
+        1. 查找健康样本：类型是步数，开始日期在最近 30 天内，分组方式为「天」，关闭「填充缺失值」。
+        2. 对第 1 步的每一项重复：把它的开始日期格式化为自定格式 yyyy-MM-dd，添加文本「格式化后的日期 步数: 它的数值」。
+        3. 查找健康样本：类型是活动能量，开始日期在最近 30 天内，分组方式为「天」，关闭「填充缺失值」。
+        4. 对第 3 步的每一项重复：把它的开始日期格式化为 yyyy-MM-dd，添加文本「格式化后的日期 活动能量: 它的数值」。
+        5. 查找健康样本：类型是静息心率，开始日期在最近 30 天内，分组方式为「天」。
+        6. 对第 5 步的每一项重复：把它的开始日期格式化为 yyyy-MM-dd，添加文本「格式化后的日期 静息心率: 它的数值」。
+        7. 查找健康样本：类型是睡眠分析，结束日期在最近 30 天内，值不是清醒，值不是在床上，不限制数量。
+        8. 对第 7 步的每一项重复：把它的结束日期格式化为自定格式 yyyy-MM-dd HH:mm，添加文本「格式化后的日期 睡眠 (它的来源): 它的时长」。
+        9. 把第 2、4、6、8 步的重复结果合并成一段文本，每项一行。
+        10. 获取设备详细信息：设备名称。
+        11. 存储文件：存储位置选 iCloud 云盘最外层的「HealthGlance」文件夹（不是「快捷指令」文件夹里面），子路径只填文件名：「health-」加上第 10 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
         """ : """
         Create a shortcut named "HealthGlance Upload" that does these steps in order:
-        1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
-        2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
-        3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
-        4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
-        5. Get Device Details: Device Name.
-        6. Make a Text with exactly these four lines, putting each result after its colon:
-        steps: the result of step 1
-        sleep: the result of step 2
-        resting heart rate: the result of step 3
-        active energy: the result of step 4
-        7. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
-        Do not use "in the last 1 day" for any date filter.
+        1. Find Health Samples where Type is Steps and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+        2. Repeat with each item from step 1: format its Start Date with the custom format yyyy-MM-dd, and make a Text of the formatted date, " steps: " and its Value.
+        3. Find Health Samples where Type is Active Energy and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+        4. Repeat with each item from step 3: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " active energy: " and its Value.
+        5. Find Health Samples where Type is Resting Heart Rate and Start Date is in the last 30 days, grouped by Day.
+        6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
+        7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
+        8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
+        9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
+        10. Get Device Details: Device Name.
+        11. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
         """
     }
 

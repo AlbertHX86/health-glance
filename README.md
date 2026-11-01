@@ -17,12 +17,13 @@ Your iPhone Health data on your Mac desktop, summarised by AI every day: how you
 
 - **A daily AI summary.** A specific headline, two or three sentences and your key numbers: sleep, steps, resting heart rate, active energy, and more when the shortcut exports them. Each number is compared with your own 7-day average. MiniMax writes it in English or Chinese; switch with **Language** in the menu.
 - **Suggestions you tick off.** Four to six concrete things to do, each with a time or an amount, such as "Walk 15 minutes after lunch, ~1,500 steps". Tick one in the menu bar, on the desktop card or in the Dynamic Island and it fades away. When the summary is rewritten later in the day, finished items are not suggested again.
-- **Questions about your data.** Type a question such as "How many more steps to reach 8,000?" and get a short answer based on your recent days, monthly averages, today's summary and the suggestions. Ask for advice or a plan ("Plan a better night's sleep"), and its steps join your suggestions. Ask to see something ("Show my sleep this year") and the chart switches to it. Each question stands on its own.
-- **Trend charts.** A line chart of any metric over a week, a month, three months, a year or two years, with the average, low and high. To fill it with your past, import the Health app's export once: years of data, read in one go.
+- **Questions about your data.** Type a question such as "How many more steps to reach 8,000?" and get a short answer based on your recent days, monthly averages, today's summary and the suggestions. Ask for advice or a plan ("Plan a better night's sleep"), and its steps join your suggestions. Each question stands on its own.
+- **Charts in answers.** Ask to see something ("Show my steps for the last two weeks against 8,000", "How has my sleep changed this year?") and the answer comes with a chart the AI picks: daily bars or a trend line over a week to two years, with the average and a goal line.
+- **History from the iPhone alone.** Each time the shortcut runs it sends the last 30 days, one line per day, so the Mac builds up a history of up to two years with nothing else to set up.
 - **Three ways to show it on the desktop:**
   - a macOS **widget** in small, medium or large;
   - a **card** pinned to the desktop, which you can drag anywhere;
-  - a **Dynamic Island**: hidden until you point at the top centre of the screen you are using. Then an icon and today's steps appear around the notch, or as a notch-shaped pill on screens without one. Click to open the card, the question box and the chart; click outside or press Esc to close it.
+  - a **Dynamic Island**: hidden until you point at the top centre of the screen you are using. Then an icon and today's steps appear around the notch, or as a notch-shaped pill on screens without one. Click to open the card and the question box; click outside or press Esc to close it.
 - **Always up to date.** The iPhone shortcut runs whenever you open an app you choose. The Mac checks iCloud once a minute and rewrites the summary when the numbers change, automatically at most every 30 minutes.
 - **Friends and family.** Everyone who shares a `HealthGlance` folder in iCloud Drive gets their own card and 7-day history. Choose whose card is shown in the menu.
 - **Games with friends.** Shared numbers become a game page that everyone opens from the folder. In **Puff Battles**, eggs hatch into random pets with rarities and skills, and the pets battle every day. In **Garden**, each player grows a plant. Invite players with a link, and start over at any time with **New game**.
@@ -78,49 +79,41 @@ On iOS 27 with Apple Intelligence, the Shortcuts app can build a shortcut from a
 
 ```text
 Create a shortcut named "Health Export" that does these steps in order:
-1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
-2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
-3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
-4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
-5. Make a Text with exactly these four lines, putting each result after its colon:
-steps: the result of step 1
-sleep: the result of step 2
-resting heart rate: the result of step 3
-active energy: the result of step 4
-6. Save File: save the text to iCloud Drive in the Shortcuts folder, subpath HealthWidget/health.txt. Do not ask where to save. Overwrite the file if it exists.
-Do not use "in the last 1 day" for any date filter.
+1. Find Health Samples where Type is Steps and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+2. Repeat with each item from step 1: format its Start Date with the custom format yyyy-MM-dd, and make a Text of the formatted date, " steps: " and its Value.
+3. Find Health Samples where Type is Active Energy and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+4. Repeat with each item from step 3: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " active energy: " and its Value.
+5. Find Health Samples where Type is Resting Heart Rate and Start Date is in the last 30 days, grouped by Day.
+6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
+7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
+8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
+9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
+10. Save File: save the text to iCloud Drive in the Shortcuts folder, subpath HealthWidget/health.txt. Do not ask where to save. Overwrite the file if it exists.
 ```
 
-The generated shortcut is not always right, so before saving, compare it with Steps 1–3 below. Check the date filters most carefully. If your iPhone is set to Chinese, use the Chinese description in [README.zh-CN.md](README.zh-CN.md) instead. Then continue with Step 4.
+The generated shortcut is not always right, so before saving, compare it with Steps 1–3 below. Check **Group By** Day and the date formats most carefully. If your iPhone is set to Chinese, use the Chinese description in [README.zh-CN.md](README.zh-CN.md) instead. Then continue with Step 4.
 
 #### By hand
 
-**Step 1: Create the shortcut.** In the Shortcuts app, create a shortcut named `Health Export`. For each metric, add **Find Health Samples** with these filters, followed by the action in the last column:
+**Step 1: Create the shortcut and add the daily totals.** In the Shortcuts app, create a shortcut named `Health Export`. For steps, active energy and resting heart rate, add these two actions each:
 
-| Metric | Find Health Samples filters | Then |
-|---|---|---|
-| Steps | Type is Steps; Start Date is today | Calculate Statistics: Sum |
-| Sleep | Type is Sleep Analysis; End Date is today; Value is not Awake; Value is not In Bed | Get Details of Health Sample: Duration → Calculate Statistics: Sum |
-| Resting heart rate | Type is Resting Heart Rate; sort by Start Date, Latest First; Limit 1 | nothing |
-| Active energy | Type is Active Energy; Start Date is today | Calculate Statistics: Sum |
-| Exercise (optional, needs Apple Watch) | Type is Exercise Minutes; Start Date is today | Calculate Statistics: Sum |
-| HRV (optional) | Type is Heart Rate Variability; Start Date is today | Calculate Statistics: Average |
-| Weight (optional) | Type is Weight; sort by Start Date, Latest First; Limit 1 | nothing |
+1. **Find Health Samples**: Type is the metric, Start Date is in the last 30 days, **Group By** Day, **Fill Missing** off. (Group By appears once a type is chosen.)
+2. **Repeat with Each** over its result. Inside, add **Format Date** on **Repeat Item › Start Date** with the custom format `yyyy-MM-dd`, then a **Text**: `[Formatted Date] steps: [Repeat Item › Value]`. Write `active energy` or `resting heart rate` for the other two.
 
-Do not use **Start Date is in the last 1 day**. It also includes yesterday, so steps come out as yesterday plus today. **Is today** gives the same numbers as the Health app's "Today". For sleep, **End Date is today** picks last night.
+**Step 2: Add the stretches of sleep.** Add **Find Health Samples**: Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake, Value is not In Bed, no limit. Add **Repeat with Each** over it; inside, **Format Date** on **Repeat Item › End Date** with `yyyy-MM-dd HH:mm`, then a **Text**: `[Formatted Date] sleep ([Repeat Item › Source]): [Repeat Item › Duration]`.
 
-**Step 2: Combine the results into text.** Add a **Text** action with one line per metric. After each colon, insert the result of the matching step from Step 1:
+**Step 3: Combine and save.** Add a **Text** with the four **Repeat Results**, one under another. Add **Save File**: turn off **Ask Where to Save**, set the subpath to `HealthWidget/health.txt` and turn on **Overwrite If File Exists**.
+
+The file then has one line per day and metric:
 
 ```
-steps: [Statistics]
-sleep: [Statistics]
-resting heart rate: [Health Samples]
-active energy: [Statistics]
+2026-10-30 steps: 10402
+2026-10-31 steps: 2188
+2026-10-31 resting heart rate: 61
+2026-10-31 06:42 sleep (Apple Watch): 1800
 ```
 
-Line names can be English or Chinese, for example `steps` or `步数`. Units are optional: `7 h 24 min`, `26640` (seconds) and `6.2 h` are all understood.
-
-**Step 3: Save the file.** Add **Save File**. Turn off **Ask Where to Save**, set the subpath to `HealthWidget/health.txt` and turn on **Overwrite If File Exists**.
+The newest day feeds today's summary; the earlier days fill in your history, which the Mac keeps for two years as the days add up. Each run sends the last 30 days again, so a day the shortcut missed is filled in later. For a longer start, change 30 to 365 for one run; sleep takes a little longer to collect then. Line names can be English or Chinese, and sleep lengths can be seconds or `30 min`. When an iPhone and an Apple Watch both recorded a night, the larger total counts; a night belongs to the day you wake up.
 
 #### Finish (both ways)
 
@@ -131,16 +124,6 @@ Line names can be English or Chinese, for example `steps` or `步数`. Units are
 An app trigger is used instead of a time of day because a locked iPhone cannot read Health data, so a timed run often fails.
 
 Action names can differ slightly between iOS versions. If a filter is missing, skip it.
-
-### 3. Bring in your past data (optional)
-
-The shortcut adds one day at a time. For a longer history in the trend chart and in answers, import the Health app's own export once:
-
-1. On the iPhone, open **Health**, tap your picture at the top right and choose **Export All Health Data**. It can take a few minutes.
-2. Send `export.zip` to the Mac, for example with AirDrop.
-3. In the menu, open **Trends** and click **Import Health export…** (shown while there is little history), or run `./build/healthwidget-cli --import ~/Downloads/export.zip`.
-
-The zip is read without unpacking it. Steps, active energy, exercise, distance, stand hours, sleep, resting heart rate, HRV, blood oxygen and weight become one entry per day for the last two years. When an iPhone and an Apple Watch both count steps, the larger count is used rather than the sum. A night's sleep belongs to the day you wake up. The import never changes today, which the shortcut keeps up to date.
 
 ## Someone else's data
 
@@ -211,18 +194,17 @@ The players' shortcut description, also included in the invite:
 
 ```text
 Create a shortcut named "HealthGlance Upload" that does these steps in order:
-1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
-2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
-3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
-4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
-5. Get Device Details: Device Name.
-6. Make a Text with exactly these four lines, putting each result after its colon:
-steps: the result of step 1
-sleep: the result of step 2
-resting heart rate: the result of step 3
-active energy: the result of step 4
-7. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 5 and ".txt". Do not ask where to save. Overwrite the file if it exists.
-Do not use "in the last 1 day" for any date filter.
+1. Find Health Samples where Type is Steps and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+2. Repeat with each item from step 1: format its Start Date with the custom format yyyy-MM-dd, and make a Text of the formatted date, " steps: " and its Value.
+3. Find Health Samples where Type is Active Energy and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
+4. Repeat with each item from step 3: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " active energy: " and its Value.
+5. Find Health Samples where Type is Resting Heart Rate and Start Date is in the last 30 days, grouped by Day.
+6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
+7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
+8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
+9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
+10. Get Device Details: Device Name.
+11. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
 ```
 
 **Save File** saves into the Shortcuts folder by default, so a generated shortcut often writes `Shortcuts/HealthGlance/health-….txt`, which is not shared and never reaches the host. After the first run, check in the Files app where the file landed. If it is wrong, tap the blue **Shortcuts** folder in **Save File**, choose `HealthGlance` at the top level of iCloud Drive, and keep only `health-`device name`.txt` as the subpath. `./build/healthwidget-cli --invite` prints the invite message.
@@ -401,7 +383,6 @@ Settings live in `~/Library/Application Support/HealthWidget/config.json`. The f
 ./build/healthwidget-cli --garden                            # update the game page now
 ./build/healthwidget-cli --new-game                          # start over: season 1 from today, new eggs
 ./build/healthwidget-cli --ask "How did I sleep this week?"  # ask a question about your data
-./build/healthwidget-cli --import ~/Downloads/export.zip     # add the Health app's export to your history
 ./build/healthwidget-cli --pets-demo --lang en               # made-up players → build/pets-demo.html
 ./build/healthwidget-cli --pets-gallery --lang en            # one pet of each rarity → build/pets-gallery.html
 ./build/healthwidget-cli --garden-demo --lang en             # made-up players → build/garden-demo.html
@@ -413,7 +394,7 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 
 | Symptom | Cause and fix |
 |---|---|
-| Steps or sleep far too high | The shortcut uses **in the last 1 day**, or sleep includes **In Bed**. Use the filters in the table above. |
+| Steps or sleep far too high | Steps are not **grouped by Day** (or **Fill Missing** is on), or sleep includes **In Bed**. Check the filters in the steps above. |
 | Numbers are higher than the Health app's | The iPhone and Apple Watch both recorded the same activity, and the shortcut adds them up. For sleep, add **Source is (your watch)**. |
 | The widget is not in the widget list | Choose **Card** or **Dynamic Island** under **On the desktop**. |
 | The menu says **No MiniMax API key yet** | No key has been saved. Paste it in the menu and click **Save**. |
@@ -428,8 +409,7 @@ Files dropped into `~/Library/Application Support/HealthWidget/inbox/` are read 
 | `Sources/App/Engine.swift` | MiniMax calls and prompts for summaries and questions (English and Chinese) |
 | `Sources/App/App.swift` | Menu-bar app: watching for data, generating, checklist, questions, pinned card, launch at login |
 | `Sources/App/Island.swift` | Dynamic Island at the top centre of the screen |
-| `Sources/App/Trends.swift` | Trend chart (Swift Charts) |
-| `Sources/App/HealthImport.swift` | Import of the Health app's export (export.zip or export.xml) |
+| `Sources/App/Trends.swift` | Charts in answers (Swift Charts) |
 | `Sources/App/Garden.swift` | Games with friends: ledger, seasons, Garden rules and page |
 | `Sources/App/Pets.swift` | Puff Battles: hatching, skills, battles, page |
 | `Sources/Widget/Widget.swift` | WidgetKit widget |
