@@ -193,8 +193,9 @@ struct MainView: View {
                 .tint(.pink)
                 .disabled(model.busy)
                 Button {
-                    let dir = FileManager.default.fileExists(atPath: Paths.inboxes[0].path) ? Paths.inboxes[0] : Paths.localInbox
+                    // the shared HealthGlance folder once it exists, else the Shortcuts one; the app reads all of them
                     try? FileManager.default.createDirectory(at: Paths.localInbox, withIntermediateDirectories: true)
+                    let dir = [Paths.inboxes[1], Paths.inboxes[0]].first { FileManager.default.fileExists(atPath: $0.path) } ?? Paths.localInbox
                     NSWorkspace.shared.open(dir)
                 } label: {
                     Label(t("Data Folder", "数据文件夹"), systemImage: "folder")
