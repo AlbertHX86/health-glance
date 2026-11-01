@@ -46,6 +46,31 @@ cd health-glance
 
 ## Set up the iPhone shortcut (once)
 
+You can let the iPhone build the shortcut from a description, or build it by hand. Either way, finish with Steps 4 and 5.
+
+### Quick way: describe it to your iPhone
+
+On iOS 27 with Apple Intelligence, the Shortcuts app can build a shortcut from a plain-language description. Tap **+** in the Shortcuts app and paste the text below:
+
+```text
+Create a shortcut named "Health Export" that does these steps in order:
+1. Find Health Samples where Type is Steps and Start Date is today. Then Calculate Statistics: Sum.
+2. Find Health Samples where Type is Sleep Analysis, End Date is today, Value is not Awake and Value is not In Bed. Then Get Details of Health Sample: Duration. Then Calculate Statistics: Sum.
+3. Find Health Samples where Type is Resting Heart Rate, sorted by Start Date with the latest first, limited to 1 sample.
+4. Find Health Samples where Type is Active Energy and Start Date is today. Then Calculate Statistics: Sum.
+5. Make a Text with exactly these four lines, putting each result after its colon:
+steps: the result of step 1
+sleep: the result of step 2
+resting heart rate: the result of step 3
+active energy: the result of step 4
+6. Save File: save the text to iCloud Drive in the Shortcuts folder, subpath HealthWidget/health.txt. Do not ask where to save. Overwrite the file if it exists.
+Do not use "in the last 1 day" for any date filter.
+```
+
+The generated shortcut is not always right, so before saving, compare it with Steps 1–3 below. Check the date filters most carefully. If your iPhone is set to Chinese, use the Chinese description in [README.zh-CN.md](README.zh-CN.md) instead. Then continue with Step 4.
+
+### By hand
+
 **Step 1: Create the shortcut.** In the Shortcuts app, create a shortcut named `Health Export`. For each metric, add **Find Health Samples** with these filters, followed by the action in the last column:
 
 | Metric | Find Health Samples filters | Then |
@@ -72,6 +97,8 @@ active energy: [Statistics]
 Line names can be English or Chinese, for example `steps` or `步数`. Units are optional: `7 h 24 min`, `26640` (seconds) and `6.2 h` are all understood.
 
 **Step 3: Save the file.** Add **Save File**. Turn off **Ask Where to Save**, set the subpath to `HealthWidget/health.txt` and turn on **Overwrite If File Exists**.
+
+### Finish (both ways)
 
 **Step 4: Run it once by hand.** The first time, the iPhone asks for permission to read each Health data type; allow them all. An automation cannot show these prompts, which is why the first run has to be manual.
 
