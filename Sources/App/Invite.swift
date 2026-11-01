@@ -19,9 +19,9 @@ enum Invite {
         6. 对第 5 步的每一项重复：把它的开始日期格式化为 yyyy-MM-dd，添加文本「格式化后的日期 静息心率: 它的数值」。
         7. 查找健康样本：类型是睡眠分析，结束日期在最近 30 天内，值不是清醒，值不是在床上，不限制数量。
         8. 对第 7 步的每一项重复：把它的结束日期格式化为自定格式 yyyy-MM-dd HH:mm，添加文本「格式化后的日期 睡眠 (它的来源): 它的时长」。
-        9. 把第 2、4、6、8 步的重复结果合并成一段文本，每项一行。
+        9. 添加一个「文本」动作，内容是第 2、4、6、8 步的四个「重复结果」，每个占一行。后面只存这一个文本，不要分别存储各步的结果。
         10. 获取设备详细信息：设备名称。
-        11. 存储文件：存储位置选 iCloud 云盘最外层的「HealthGlance」文件夹（不是「快捷指令」文件夹里面），子路径只填文件名：「health-」加上第 10 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
+        11. 存储文件：把第 9 步的文本存进去，存储位置选 iCloud 云盘最外层的「HealthGlance」文件夹（不是「快捷指令」文件夹里面），子路径只填文件名：「health-」加上第 10 步的设备名称，再加「.txt」。不要询问存储位置。文件已存在时覆盖。
         """ : """
         Create a shortcut named "HealthGlance Upload" that does these steps in order:
         1. Find Health Samples where Type is Steps and Start Date is in the last 30 days, grouped by Day, with Fill Missing off.
@@ -32,9 +32,9 @@ enum Invite {
         6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
         7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
         8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
-        9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
+        9. Add one Text action that contains the four Repeat Results of steps 2, 4, 6 and 8, each on its own line. Only this one text is saved; do not save the steps' results separately.
         10. Get Device Details: Device Name.
-        11. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
+        11. Save File: save the Text from step 9, with the destination folder set to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
         """
     }
 

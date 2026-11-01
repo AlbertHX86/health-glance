@@ -87,8 +87,8 @@ Create a shortcut named "Health Export" that does these steps in order:
 6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
 7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
 8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
-9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
-10. Save File: save the text to iCloud Drive in the Shortcuts folder, subpath HealthWidget/health.txt. Do not ask where to save. Overwrite the file if it exists.
+9. Add one Text action that contains the four Repeat Results of steps 2, 4, 6 and 8, each on its own line. Only this one text is saved; do not save the steps' results separately.
+10. Save File: save the Text from step 9 to iCloud Drive in the Shortcuts folder, subpath HealthWidget/health.txt. Do not ask where to save. Overwrite the file if it exists.
 ```
 
 The generated shortcut is not always right, so before saving, compare it with Steps 1–3 below. Check **Group By** Day and the date formats most carefully. If your iPhone is set to Chinese, use the Chinese description in [README.zh-CN.md](README.zh-CN.md) instead. Then continue with Step 4.
@@ -202,9 +202,9 @@ Create a shortcut named "HealthGlance Upload" that does these steps in order:
 6. Repeat with each item from step 5: format its Start Date as yyyy-MM-dd, and make a Text of the formatted date, " resting heart rate: " and its Value.
 7. Find Health Samples where Type is Sleep Analysis, End Date is in the last 30 days, Value is not Awake and Value is not In Bed, with no limit.
 8. Repeat with each item from step 7: format its End Date with the custom format yyyy-MM-dd HH:mm, and make a Text of the formatted date, " sleep (", its Source, "): " and its Duration.
-9. Combine the Repeat Results of steps 2, 4, 6 and 8 into one text, one item per line.
+9. Add one Text action that contains the four Repeat Results of steps 2, 4, 6 and 8, each on its own line. Only this one text is saved; do not save the steps' results separately.
 10. Get Device Details: Device Name.
-11. Save File: set the destination folder to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
+11. Save File: save the Text from step 9, with the destination folder set to the "HealthGlance" folder at the top level of iCloud Drive (not inside the Shortcuts folder), with only the file name as the subpath: "health-" followed by the device name from step 10 and ".txt". Do not ask where to save. Overwrite the file if it exists.
 ```
 
 **Save File** saves into the Shortcuts folder by default, so a generated shortcut often writes `Shortcuts/HealthGlance/health-….txt`, which is not shared and never reaches the host. After the first run, check in the Files app where the file landed. If it is wrong, tap the blue **Shortcuts** folder in **Save File**, choose `HealthGlance` at the top level of iCloud Drive, and keep only `health-`device name`.txt` as the subpath. `./build/healthwidget-cli --invite` prints the invite message.

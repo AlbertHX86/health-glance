@@ -116,9 +116,11 @@ enum HealthParser {
         let fm = FileManager.default
         var out: [(URL, Date)] = []
         // one level of subfolders too: a Save File subpath of HealthGlance/health-….txt inside the shared folder makes one
+        // (but not a folder named like a data file, which stands for one file: see `text(at:)`)
         let subs = Paths.inboxes.flatMap { d in
             ((try? fm.contentsOfDirectory(at: d, includingPropertiesForKeys: [.isDirectoryKey], options: .skipsHiddenFiles)) ?? [])
                 .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+                .filter { !["txt", "json", "md"].contains($0.pathExtension.lowercased()) }
         }
         for dir in Paths.inboxes + subs {
             guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
@@ -195,7 +197,7 @@ enum HealthParser {
     /// recorded a night, the largest total counts, so an iPhone and a Watch are not added together. Returns the days in
     /// date order, or nothing for a one-day "key: value" file.
     static func readDays(_ url: URL) -> [DayRecord] {
-        guard let data = try? Data(contentsOf: url), let raw = String(data: data, encoding: .utf8) else { return [] }
+        guard let raw = text(at: url) else { return [] }
         let stamp = DateFormatter()
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "yyyy-MM-dd HH:mm"
@@ -225,6 +227,20 @@ enum HealthParser {
             return m.isEmpty ? nil : DayRecord(date: d, metrics: m, raw: (lines[d] ?? []).joined(separator: "\n"),
                                               file: url.lastPathComponent, person: name, plant: plant)
         }
+    }
+
+    /// A data file's text. When the shortcut's last Text is a list rather than one combined text, Save File writes a
+    /// folder of that name with one small file per line instead; read those in the order they were written, so a newer
+    /// line wins.
+    static func text(at url: URL) -> String? {
+        guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+            return (try? Data(contentsOf: url)).flatMap { String(data: $0, encoding: .utf8) }
+        }
+        let items = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey], options: .skipsHiddenFiles)) ?? []
+        func date(_ u: URL) -> Date { (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast }
+        let lines = items.filter { $0.pathExtension.lowercased() == "txt" }.sorted { date($0) < date($1) }
+            .compactMap { (try? Data(contentsOf: $0)).flatMap { String(data: $0, encoding: .utf8) }.map(plainText) }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     /// A length of time in seconds: "1800", "30 min", "1 小时 5 分钟", "0:30:00".
