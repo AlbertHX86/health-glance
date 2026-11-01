@@ -104,7 +104,8 @@ final class Island: ObservableObject {
         expanded = false
         monitors.forEach { NSEvent.removeMonitor($0) }
         monitors = []
-        DispatchQueue.main.async { self.place(); self.track() }
+        // shrink the window once the card has animated back into the island
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { if !self.expanded { self.place(); self.track() } }
     }
 
     /// The screen with a notch if there is one, else the one with the menu bar.
@@ -119,12 +120,13 @@ final class Island: ObservableObject {
         return CGSize(width: 0, height: max(24, s.frame.maxY - s.visibleFrame.maxY))
     }
 
-    /// Size the window to the island and keep it centred at the top of the screen.
+    /// Size the window to the island, centred under the notch at the top of the screen. The window changes size at
+    /// once; SwiftUI animates the island inside it, pinned to the top centre, so the card always opens out of the island.
     func place() {
         guard let p = panel, let s = Self.screen, let v = p.contentView else { return }
         let size = v.fittingSize
-        let frame = NSRect(x: s.frame.midX - size.width / 2, y: s.frame.maxY - size.height, width: size.width, height: size.height)
-        p.setFrame(frame, display: true, animate: p.isVisible && abs(frame.height - p.frame.height) > 1)
+        let x = (s.frame.midX - size.width / 2).rounded()
+        p.setFrame(NSRect(x: x, y: s.frame.maxY - size.height, width: size.width, height: size.height), display: true)
     }
 }
 
@@ -179,6 +181,7 @@ struct IslandView: View {
         .background(.black, in: UnevenRoundedRectangle(bottomLeadingRadius: island.expanded ? 30 : notch.height / 2,
                                                         bottomTrailingRadius: island.expanded ? 30 : notch.height / 2, style: .continuous))
         .environment(\.colorScheme, .dark)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)  // centred and at the top whatever the window size
         // hidden: shrunk into the notch (or the top edge) and transparent
         .scaleEffect(visible ? 1 : 0.6, anchor: .top)
         .opacity(visible ? 1 : 0)

@@ -162,8 +162,8 @@ enum Engine {
     要求：只依据这些数据和一般健康常识，数据回答不了时直说；引用具体数字；不超过 120 个汉字，纯文本，不用表格；语气友好、简洁；不做医学诊断，有症状或数字令人担心时建议就医。用简体中文回答。
     """
 
-    /// Answer a question about one person's data (nil = you), continuing the conversation in `history`.
-    static func ask(_ question: String, history: [(q: String, a: String)] = [], person: String? = nil) async throws -> String {
+    /// Answer one question about one person's data (nil = you); each question stands alone.
+    static func ask(_ question: String, person: String? = nil) async throws -> String {
         let cfg = Config.load()
         guard !cfg.apiKey.isEmpty else { throw EngineError.noKey }
         let lang = cfg.language == "zh" ? "zh" : "en"
@@ -176,10 +176,8 @@ enum Engine {
             ctx += (zh ? "清单：" : "Checklist: ") + s.tips.map { ((s.done ?? []).contains($0) ? "[x] " : "[ ] ") + $0 }.joined(separator: "; ") + "\n"
         }
         let now = Date().formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: zh ? "zh_CN" : "en_US")))
-        var msgs: [[String: Any]] = [["role": "system", "content": (zh ? askZH : askEN) + (zh ? "\n现在是 \(now)。\n\n" : "\nIt is now \(now).\n\n") + ctx]]
-        for h in history.suffix(6) { msgs += [["role": "user", "content": h.q], ["role": "assistant", "content": h.a]] }
-        msgs.append(["role": "user", "content": question])
-        return try await chat(cfg, messages: msgs)
+        let msgs: [[String: Any]] = [["role": "system", "content": (zh ? askZH : askEN) + (zh ? "\n现在是 \(now)。\n\n" : "\nIt is now \(now).\n\n") + ctx]]
+        return try await chat(cfg, messages: msgs + [["role": "user", "content": question]])
     }
 
     static func chat(_ cfg: Config, messages: [[String: Any]]) async throws -> String {

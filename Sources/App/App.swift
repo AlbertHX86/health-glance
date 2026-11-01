@@ -12,7 +12,7 @@ final class Model: ObservableObject {
     @Published var summaries: [String: Summary] = [:]
     @Published var people: [String] = []
     @Published var selected = UserDefaults.standard.string(forKey: "person") ?? "" {
-        willSet { if newValue != selected { chat = [] } }
+        willSet { if newValue != selected { answer = nil } }
         didSet { UserDefaults.standard.set(selected, forKey: "person"); publishDisplay() }
     }
     @Published var sources = Sources.latest()
@@ -33,7 +33,7 @@ final class Model: ObservableObject {
     @Published var shortcutLink = Config.load().inviteShortcutLink
     @Published var myDevice = Config.load().myDevice
     @Published var question = ""
-    @Published var chat: [QA] = []
+    @Published var answer: QA?
     @Published var asking = false
 
     struct QA: Identifiable {
@@ -183,19 +183,18 @@ final class Model: ObservableObject {
         publishDisplay()
     }
 
-    /// Ask about the data of the person shown; the conversation lasts until it is cleared or the person changes.
+    /// Ask about the data of the person shown. Each question stands alone: the answer replaces the last one.
     func ask() {
         let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !asking else { return }
-        let history = chat.map { (q: $0.q, a: $0.a) }
         let person = Self.person(selected)
         question = ""
         asking = true
-        chat.append(QA(q: q, a: "…"))
+        answer = QA(q: q, a: "…")
         Task { @MainActor in
             let a: String
-            do { a = try await Engine.ask(q, history: history, person: person) } catch { a = error.localizedDescription }
-            if !chat.isEmpty { chat[chat.count - 1].a = a }
+            do { a = try await Engine.ask(q, person: person) } catch { a = error.localizedDescription }
+            if answer?.q == q { answer?.a = a }
             asking = false
         }
     }
@@ -448,24 +447,17 @@ struct AskView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !model.chat.isEmpty {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(model.chat) { qa in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(qa.q).font(.callout.weight(.semibold))
-                                    Text(qa.a).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .id(qa.id)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            if let qa = model.answer {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(qa.q).font(.callout.weight(.semibold))
+                        Text(qa.a).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxHeight: 220)
-                    .onChange(of: model.chat.last?.a) { _, _ in if let id = model.chat.last?.id { proxy.scrollTo(id, anchor: .bottom) } }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxHeight: 220)
+                .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 6) {
                 TextField(t("Ask about your health…", "问问你的健康数据…"), text: $model.question)
@@ -473,8 +465,8 @@ struct AskView: View {
                     .onSubmit { model.ask() }
                     .disabled(model.asking)
                 if model.asking { ProgressView().controlSize(.small) }
-                if !model.chat.isEmpty && !model.asking {
-                    Button { model.chat = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                if model.answer != nil && !model.asking {
+                    Button { model.answer = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
                         .buttonStyle(.plain).help(t("Clear", "清空"))
                 }
             }

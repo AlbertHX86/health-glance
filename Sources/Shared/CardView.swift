@@ -215,7 +215,7 @@ struct CardView: View {
                     }
                 }
                 Spacer(minLength: 0)
-                Text("\(s.model) · \(s.generatedAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: lang == "zh" ? "zh_CN" : "en_US"))))")
+                Text(t("Updated ", "更新于 ") + s.generatedAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: lang == "zh" ? "zh_CN" : "en_US"))))
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }
         }
